@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #1A1A2E;
+    background-image: linear-gradient(180deg, #1A1A2E 0%, #121220 100%);
+    background-attachment: fixed;
+    color: #FFFFFF;
+    min-height: 100vh;
+    margin: 0;
+  }
+}
+
+/* Custom sleek dark scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1A1A2E;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2E2E50;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #0047AB;
+}
+
+/* Kinetic Gradient Utilities */
+.bg-signal-gradient {
+  background: linear-gradient(135deg, #FF6B35 0%, #FF1840 100%);
+}
+
+.hover-signal-gradient:hover {
+  background: linear-gradient(135deg, #FF7B47 0%, #FF2B4F 100%);
+}
+
+.text-signal-gradient {
+  background: linear-gradient(135deg, #FF6B35 0%, #FF1840 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Glow effects */
+.glow-signal {
+  box-shadow: 0 0 20px -2px rgba(255, 24, 64, 0.45);
+}
+
+.glow-signal-sm {
+  box-shadow: 0 0 10px -1px rgba(255, 24, 64, 0.35);
+}
+
+.glow-amber {
+  box-shadow: 0 0 15px -2px rgba(245, 158, 11, 0.5);
+}
+
+.glow-cobalt {
+  box-shadow: 0 0 15px -2px rgba(0, 71, 171, 0.45);
+}
