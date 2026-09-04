@@ -1,0 +1,18 @@
+# Security and Permissions for all routes
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: clipboard-read=(self), clipboard-write=(self)
+
+# Cache immutable assets for 1 year
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Ensure service worker, registration, and webmanifest are never cached stale
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+/registerSW.js
+  Cache-Control: public, max-age=0, must-revalidate
+/manifest.webmanifest
+  Cache-Control: public, max-age=0, must-revalidate
