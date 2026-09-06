@@ -5,23 +5,19 @@ import type { ConnectionState } from '../types';
 interface TopBarProps {
   roomId: string;
   connectionState: ConnectionState;
-  isHost: boolean;
   canInstall: boolean;
   onInstallClick: () => void;
   onNewRoom: () => void;
   onOpenInfo: () => void;
-  onSwitchRole?: (targetMode: 'host' | 'receive') => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   roomId,
   connectionState,
-  isHost,
   canInstall,
   onInstallClick,
   onNewRoom,
   onOpenInfo,
-  onSwitchRole,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -35,7 +31,7 @@ export const TopBar: React.FC<TopBarProps> = ({
     <header className="w-full border-b border-surfaceBorder bg-surface/90 backdrop-blur-md sticky top-0 z-40 pt-safe px-safe">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Logo */}
-        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <div className="relative flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-canvas border border-surfaceBorder shadow-inner group shrink-0 p-1 hover:border-signalStart/50 transition-colors">
             <img
               src="/PaDrop-no-bg.png"
@@ -45,30 +41,9 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
 
           <div className="flex flex-col">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="text-base sm:text-xl font-extrabold tracking-tight text-white flex items-center">
-                Pa<span className="text-signal-gradient">Drop</span>
-              </span>
-              {onSwitchRole ? (
-                <button
-                  type="button"
-                  onClick={() => onSwitchRole(isHost ? 'receive' : 'host')}
-                  title={`Click to switch to ${isHost ? 'Receiver' : 'Sender'} mode`}
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95 cursor-pointer ${
-                    isHost
-                      ? 'bg-signal-gradient text-white border-transparent shadow-[0_0_10px_rgba(255,24,64,0.35)] hover:opacity-90'
-                      : 'bg-cobalt text-white border-cobaltLight shadow-[0_0_10px_rgba(0,71,171,0.4)] hover:bg-cobaltLight'
-                  }`}
-                >
-                  <span>{isHost ? '📤 SENDER' : '📥 RECEIVER'}</span>
-                  <span className="opacity-75 text-[9px] font-normal underline decoration-dotted">⇄ switch</span>
-                </button>
-              ) : (
-                <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cobalt/30 text-blue-300 border border-cobalt/50">
-                  {isHost ? 'HOST' : 'RECEIVER'}
-                </span>
-              )}
-            </div>
+            <span className="text-base sm:text-xl font-extrabold tracking-tight text-white flex items-center">
+              Pa<span className="text-signal-gradient">Drop</span>
+            </span>
             <span className="text-[11px] text-slate-400 font-medium hidden lg:block">
               Instant, zero-cloud peer-to-peer clipboard & file drop
             </span>

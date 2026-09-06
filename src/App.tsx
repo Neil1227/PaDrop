@@ -211,7 +211,6 @@ export function App() {
       <TopBar
         roomId={roomId}
         connectionState={connectionState}
-        isHost={isHost}
         canInstall={!!installPrompt}
         onInstallClick={() => {
           if (installPrompt) {
@@ -220,7 +219,6 @@ export function App() {
         }}
         onNewRoom={handleNewRoom}
         onOpenInfo={() => setIsInfoOpen(true)}
-        onSwitchRole={handleSwitchRole}
       />
 
       {/* Info / Readme Modal */}

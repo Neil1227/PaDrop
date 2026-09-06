@@ -104,27 +104,28 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
   // Compact Linked status chip when connected
   if (isConnected && !isQrExpanded) {
     return (
-      <section className="w-full bg-surface border border-surfaceBorder rounded-2xl p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 transition-all duration-300">
-        <div className="flex items-center gap-3">
-          <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-canvas border border-emerald-500/30 text-emerald-400 shrink-0">
-            <ShieldCheck className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+      <section className="w-full bg-surface border border-surfaceBorder rounded-2xl p-3 sm:p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 transition-all duration-300">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-canvas border border-emerald-500/30 text-emerald-400 shrink-0">
+            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
+            <span className="absolute -top-1 -right-1 flex h-2 w-2 sm:h-2.5 sm:w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signalEnd opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-signal-gradient"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-signal-gradient"></span>
             </span>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-bold text-white">
-                Direct WebRTC P2P Channel Active
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs sm:text-sm font-bold text-white">
+                Direct WebRTC Channel Active
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${isHost ? 'bg-signal-gradient' : 'bg-cobalt'
-                }`}>
-                {isHost ? 'SENDER (HOST)' : 'RECEIVER (GUEST)'}
+              <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider uppercase text-white shadow-xs ${
+                isHost ? 'bg-signal-gradient' : 'bg-cobalt'
+              }`}>
+                {isHost ? 'HOST' : 'GUEST'}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
-              Room <span className="font-mono text-slate-200 font-semibold">{roomId}</span> • Real-time clipboard sync & 64KB chunked file streaming ready
+            <p className="text-[11px] sm:text-xs text-slate-400">
+              Room <span className="font-mono text-slate-200 font-semibold">{roomId}</span> • Real-time clipboard & 64KB chunked file streaming
             </p>
           </div>
         </div>
@@ -133,7 +134,7 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
           <button
             type="button"
             onClick={() => setIsQrExpanded(true)}
-            className="min-h-[44px] flex items-center gap-1.5 px-3 py-2 rounded-xl bg-canvas hover:bg-surfaceBorder border border-surfaceBorder text-slate-300 hover:text-white text-xs font-medium transition-colors"
+            className="min-h-[38px] sm:min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-canvas hover:bg-surfaceBorder border border-surfaceBorder text-slate-300 hover:text-white text-xs font-medium transition-colors"
           >
             <QrCode className="w-3.5 h-3.5 text-cobaltLight" />
             <span>Show QR</span>
@@ -141,7 +142,7 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
           <button
             type="button"
             onClick={handleCopyLink}
-            className="min-h-[44px] flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-canvas hover:bg-surfaceBorder border border-surfaceBorder text-slate-300 hover:text-white text-xs font-medium transition-colors"
+            className="min-h-[38px] sm:min-h-[44px] flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 rounded-xl bg-canvas hover:bg-surfaceBorder border border-surfaceBorder text-slate-300 hover:text-white text-xs font-medium transition-colors"
           >
             {copiedLink ? (
               <>
@@ -164,31 +165,39 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
   return (
     <section className="w-full flex flex-col gap-4 transition-all">
       {/* Role Selection Tabs */}
-      <div className="w-full flex items-center justify-between p-1.5 rounded-2xl bg-surface border border-surfaceBorder shadow-inner">
+      <div className="w-full flex items-center justify-between p-1 sm:p-1.5 rounded-2xl bg-surface border border-surfaceBorder shadow-inner gap-1">
         <button
           type="button"
           onClick={() => handleTabSwitch('send')}
-          className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'send'
+          className={`flex-1 min-h-[44px] flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            activeTab === 'send'
               ? 'bg-signal-gradient text-white shadow-[0_0_16px_rgba(255,24,64,0.4)] scale-[1.01]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-canvas/50'
-            }`}
+          }`}
         >
-          <Send className="w-4 h-4" />
-          <span>Send from this Device</span>
-          <span className="hidden sm:inline-block text-[10px] font-normal opacity-80">(Display QR Code)</span>
+          <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+          <span>
+            <span className="inline sm:hidden">Send Mode</span>
+            <span className="hidden sm:inline">Send from this Device</span>
+          </span>
+          <span className="hidden md:inline-block text-[10px] font-normal opacity-80">(Display QR)</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTabSwitch('receive')}
-          className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'receive'
+          className={`flex-1 min-h-[44px] flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+            activeTab === 'receive'
               ? 'bg-cobalt hover:bg-cobaltLight text-white shadow-[0_0_16px_rgba(0,71,171,0.5)] scale-[1.01]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-canvas/50'
-            }`}
+          }`}
         >
-          <DownloadCloud className="w-4 h-4" />
-          <span>Receive on this Device</span>
-          <span className="hidden sm:inline-block text-[10px] font-normal opacity-80">(Camera Scanner & Radar)</span>
+          <DownloadCloud className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+          <span>
+            <span className="inline sm:hidden">Receive Mode</span>
+            <span className="hidden sm:inline">Receive on this Device</span>
+          </span>
+          <span className="hidden md:inline-block text-[10px] font-normal opacity-80">(Camera & Radar)</span>
         </button>
       </div>
 
@@ -358,14 +367,9 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
                 <Camera className="w-6 h-6" />
               </div>
               <div className="flex flex-col text-center sm:text-left">
-                <div className="flex items-center justify-center sm:justify-start gap-2">
-                  <h3 className="text-base font-bold text-white tracking-tight">
-                    In-App Camera QR Scanner
-                  </h3>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    Fastest PWA Link
-                  </span>
-                </div>
+                <h3 className="text-base font-bold text-white tracking-tight">
+                  In-App Camera QR Scanner
+                </h3>
                 <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
                   Scan the QR code displayed on your PC or sender device without leaving the web app.
                 </p>
