@@ -318,7 +318,17 @@ export function App() {
 
         {/* 2-Column Responsive Dashboard */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch flex-1">
-          {/* Left Column: Synchronized Clipboard & P2P Chat */}
+          {/* Left / Primary Column: Chunked File Dropzone & Transfer Tray */}
+          <div className="h-full">
+            <FileDropzoneSection
+              files={transferFiles}
+              activeTransfer={activeTransfer}
+              connectionState={connectionState}
+              onSendFile={handleSendFile}
+            />
+          </div>
+
+          {/* Right / Secondary Column: Synchronized Clipboard Scratchpad & P2P Chat */}
           <div className="h-full">
             <ClipboardSection
               text={clipboardText}
@@ -329,16 +339,6 @@ export function App() {
               onSendChatMessage={handleSendChatMessage}
               onClearChat={handleClearChat}
               isHost={isHost}
-            />
-          </div>
-
-          {/* Right Column: Chunked File Dropzone & Transfer Tray */}
-          <div className="h-full">
-            <FileDropzoneSection
-              files={transferFiles}
-              activeTransfer={activeTransfer}
-              connectionState={connectionState}
-              onSendFile={handleSendFile}
             />
           </div>
         </div>
