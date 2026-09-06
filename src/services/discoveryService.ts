@@ -5,13 +5,119 @@ const DISCOVERY_CHANNEL_NAME = 'padrop_discovery_channel_v1';
 const STORAGE_REGISTRY_KEY = 'padrop_active_hosts_registry';
 const HEARTBEAT_INTERVAL_MS = 3000;
 const ROOM_EXPIRY_THRESHOLD_MS = 12000;
-const MQTT_DISCOVERY_TOPIC = 'padrop/v1/radar/presence';
 
 // Public high-speed WebSocket MQTT brokers for cross-network WebRTC presence
 const MQTT_BROKERS = [
   'wss://broker.emqx.io:8084/mqtt',
   'wss://broker.hivemq.com:8884/mqtt',
 ];
+
+let cachedNetworkHash: string | null = null;
+let networkHashPromise: Promise<string> | null = null;
+
+// FNV-1a fast 32-bit hash algorithm to produce clean 8-character hex string
+function fnv1a(str: string): string {
+  let hash = 2166136261;
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Automatically discovers the local Wi-Fi / public network signature using native WebRTC STUN.
+ * Devices connected to the same Wi-Fi router share the exact same public reflexive IP,
+ * producing identical network hashes so Nearby Share Radar isolates discovery exclusively
+ * to devices in the same home, office, or local area.
+ */
+export async function getNetworkHash(): Promise<string> {
+  if (cachedNetworkHash) return cachedNetworkHash;
+  if (networkHashPromise) return networkHashPromise;
+
+  networkHashPromise = (async () => {
+    if (typeof window === 'undefined') return 'local-default';
+
+    const isLocalhost =
+      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (isLocalhost) {
+      cachedNetworkHash = 'local-dev';
+      return cachedNetworkHash;
+    }
+
+    // 1. Native WebRTC STUN candidate harvesting (Zero 3rd-party API dependency)
+    try {
+      const stunIp = await new Promise<string | null>((resolve) => {
+        let isResolved = false;
+        const timeout = setTimeout(() => {
+          if (!isResolved) {
+            isResolved = true;
+            resolve(null);
+            try { pc.close(); } catch {}
+          }
+        }, 1200);
+
+        const pc = new RTCPeerConnection({
+          iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+        });
+
+        pc.onicecandidate = (event) => {
+          if (!event || !event.candidate || isResolved) return;
+          const candidateStr = event.candidate.candidate;
+          // Match standard srflx candidate: typ srflx
+          if (candidateStr.includes('srflx')) {
+            const parts = candidateStr.split(' ');
+            if (parts.length > 4 && /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/.test(parts[4])) {
+              isResolved = true;
+              clearTimeout(timeout);
+              resolve(parts[4]);
+              try { pc.close(); } catch {}
+            }
+          }
+        };
+
+        pc.createDataChannel('ping');
+        pc.createOffer()
+          .then((offer) => pc.setLocalDescription(offer))
+          .catch(() => {
+            if (!isResolved) {
+              isResolved = true;
+              clearTimeout(timeout);
+              resolve(null);
+            }
+          });
+      });
+
+      if (stunIp) {
+        cachedNetworkHash = `net-${fnv1a(stunIp)}`;
+        return cachedNetworkHash;
+      }
+    } catch {
+      // STUN fallback
+    }
+
+    // 2. Fast Fallback: IP lookup API
+    try {
+      const controller = new AbortController();
+      const fetchTimer = setTimeout(() => controller.abort(), 1200);
+      const res = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+      clearTimeout(fetchTimer);
+      const data = await res.json();
+      if (data && data.ip) {
+        cachedNetworkHash = `net-${fnv1a(data.ip)}`;
+        return cachedNetworkHash;
+      }
+    } catch {
+      // Fallback
+    }
+
+    // 3. Fallback to origin hash
+    cachedNetworkHash = `net-${fnv1a(window.location.origin)}`;
+    return cachedNetworkHash;
+  })();
+
+  return networkHashPromise;
+}
 
 export function getDeviceType(): DeviceType {
   if (typeof window === 'undefined') return 'desktop';
@@ -65,11 +171,17 @@ class DiscoveryService {
   private discoveredRooms: Map<string, DiscoveredRoom> = new Map();
   private subscribers: Set<(rooms: DiscoveredRoom[]) => void> = new Set();
   
-  // MQTT Mesh State
+  // MQTT Mesh State (Scoped by Local Wi-Fi Network Fingerprint)
   private mqttClient: MqttClient | null = null;
   private isMqttConnected: boolean = false;
   private currentBrokerIndex: number = 0;
   private isMqttConnecting: boolean = false;
+  private currentNetworkHash: string = 'local-dev';
+  private currentMqttTopic: string = 'padrop/v1/radar/local-dev';
+
+  public getNetworkSignature(): string {
+    return this.currentNetworkHash;
+  }
 
   constructor() {
     this.initChannel();
@@ -104,12 +216,18 @@ class DiscoveryService {
     }
   }
 
-  private initMqtt() {
+  private async initMqtt() {
     if (typeof window === 'undefined' || this.isMqttConnecting || (this.mqttClient && this.isMqttConnected)) {
       return;
     }
 
     this.isMqttConnecting = true;
+
+    // Dynamically resolve same Wi-Fi network hash
+    const netHash = await getNetworkHash();
+    this.currentNetworkHash = netHash;
+    this.currentMqttTopic = `padrop/v1/radar/${netHash}`;
+
     const brokerUrl = MQTT_BROKERS[this.currentBrokerIndex % MQTT_BROKERS.length];
     const clientId = `padrop-${Math.random().toString(36).substring(2, 9)}`;
 
@@ -142,7 +260,7 @@ class DiscoveryService {
         this.isMqttConnected = true;
         this.isMqttConnecting = false;
 
-        client.subscribe(MQTT_DISCOVERY_TOPIC, { qos: 0 }, (err: Error | null) => {
+        client.subscribe(this.currentMqttTopic, { qos: 0 }, (err: Error | null) => {
           if (err) {
             console.warn('MQTT subscribe error:', err);
           } else {
@@ -287,7 +405,7 @@ class DiscoveryService {
     };
 
     try {
-      this.mqttClient.publish(MQTT_DISCOVERY_TOPIC, JSON.stringify(payload), { qos: 0 });
+      this.mqttClient.publish(this.currentMqttTopic, JSON.stringify(payload), { qos: 0 });
     } catch {
       // ignore
     }
@@ -428,7 +546,7 @@ class DiscoveryService {
     if (this.mqttClient && this.isMqttConnected) {
       try {
         this.mqttClient.publish(
-          MQTT_DISCOVERY_TOPIC,
+          this.currentMqttTopic,
           JSON.stringify({ type: 'discovery-tombstone', roomId: cleaned, timestamp: Date.now() }),
           { qos: 0 }
         );
@@ -486,7 +604,7 @@ class DiscoveryService {
     // Send query via MQTT mesh
     if (this.mqttClient && this.isMqttConnected) {
       try {
-        this.mqttClient.publish(MQTT_DISCOVERY_TOPIC, JSON.stringify(queryMsg), { qos: 0 });
+        this.mqttClient.publish(this.currentMqttTopic, JSON.stringify(queryMsg), { qos: 0 });
       } catch {
         // ignore
       }

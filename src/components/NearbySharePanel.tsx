@@ -118,11 +118,17 @@ export const NearbySharePanel: React.FC<NearbySharePanelProps> = ({
             </span>
           </div>
           <div className="flex flex-col text-left">
-            <h3 className="text-sm font-bold text-white tracking-tight">
-              Nearby Share Radar
-            </h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h3 className="text-sm font-bold text-white tracking-tight">
+                Nearby Share Radar
+              </h3>
+              <span className="inline-flex items-center gap-1 text-[9px] font-semibold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 rounded-md shadow-2xs">
+                <Wifi className="w-2.5 h-2.5 text-emerald-400" />
+                <span>Same Wi-Fi</span>
+              </span>
+            </div>
             <p className="text-[11px] text-slate-400">
-              Discovers online PaDrop senders automatically
+              Discovers PaDrop receivers on your local Wi-Fi
             </p>
           </div>
         </div>
@@ -181,10 +187,10 @@ export const NearbySharePanel: React.FC<NearbySharePanelProps> = ({
             <div className="flex flex-col gap-1 mt-1">
               <p className="text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5">
                 <Zap className="w-3.5 h-3.5 text-signalStart" />
-                <span>Scanning for nearby PaDrop hosts…</span>
+                <span>Scanning for nearby PaDrop receivers…</span>
               </p>
               <p className="text-[11px] text-slate-400 max-w-xs leading-relaxed">
-                Open PaDrop in <strong className="text-slate-300">Send Mode</strong> on your other device to connect instantly.
+                Only devices on your <strong className="text-slate-300">same Wi-Fi network</strong> appear here automatically.
               </p>
             </div>
           </div>
