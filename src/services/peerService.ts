@@ -38,6 +38,10 @@ export class PeerService {
   private isSending: boolean = false;
   private sendQueue: File[] = [];
 
+  // Connection retry state for guests
+  private connectRetryCount: number = 0;
+  private connectRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(callbacks: PeerServiceCallbacks) {
     this.callbacks = callbacks;
   }
@@ -45,6 +49,7 @@ export class PeerService {
   public init(roomId: string, mode: 'host' | 'receive') {
     this.roomId = roomId.trim().toLowerCase();
     this.isHost = mode === 'host';
+    this.connectRetryCount = 0;
     this.cleanup();
 
     this.setConnectionState(mode === 'host' ? 'waiting' : 'connecting');
@@ -77,7 +82,11 @@ export class PeerService {
       this.peer.on('connection', (conn) => {
         // Host accepts incoming connection
         if (this.connection) {
-          this.connection.close();
+          try {
+            this.connection.close();
+          } catch {
+            // ignore
+          }
         }
         this.setupConnection(conn);
       });
@@ -85,9 +94,19 @@ export class PeerService {
       this.peer.on('error', (err) => {
         console.warn('PeerJS error:', err.type, err.message);
         if (err.type === 'peer-unavailable') {
-          this.setConnectionState('waiting', 'Host not found. Ensure host has room open.');
+          if (!this.isHost && this.connectRetryCount < 4) {
+            this.connectRetryCount++;
+            this.setConnectionState('connecting');
+            if (this.connectRetryTimer) clearTimeout(this.connectRetryTimer);
+            this.connectRetryTimer = setTimeout(() => {
+              if (this.peer && !this.peer.destroyed && !this.connection?.open) {
+                this.connectToHost();
+              }
+            }, this.connectRetryCount * 1000);
+          } else {
+            this.setConnectionState('waiting', 'Host not found. Ensure host has room open.');
+          }
         } else if (err.type === 'unavailable-id') {
-          // If ID is occupied, reconnect with random guest or notify
           this.setConnectionState('error', 'Room already in use or collision detected.');
         } else {
           this.setConnectionState('error', err.message);
@@ -106,7 +125,7 @@ export class PeerService {
   }
 
   private connectToHost() {
-    if (!this.peer) return;
+    if (!this.peer || this.peer.destroyed) return;
     const targetHostId = `padrop-${this.roomId}-host`;
     const conn = this.peer.connect(targetHostId, {
       reliable: true,
@@ -119,6 +138,11 @@ export class PeerService {
     this.connection = conn;
 
     conn.on('open', () => {
+      this.connectRetryCount = 0;
+      if (this.connectRetryTimer) {
+        clearTimeout(this.connectRetryTimer);
+        this.connectRetryTimer = null;
+      }
       this.setConnectionState('connected');
       // Send handshake ping
       this.sendRaw({ type: 'ping' });
@@ -226,7 +250,8 @@ export class PeerService {
     this.callbacks.onTransferProgress(activeTransfer);
 
     // Chunking stream
-    const rtcChannel = (this.connection as unknown as { dataChannel?: RTCDataChannel }).dataChannel;
+    const rawConn = this.connection as any;
+    const rtcChannel: RTCDataChannel | undefined = rawConn?.dataChannel || rawConn?._dc || rawConn?._dataChannel;
 
     for (let i = 0; i < totalChunks; i++) {
       if (!this.connection || !this.connection.open) {
@@ -237,7 +262,7 @@ export class PeerService {
       }
 
       // Backpressure flow control
-      if (rtcChannel && rtcChannel.bufferedAmount > MAX_BUFFERED_AMOUNT) {
+      if (rtcChannel && typeof rtcChannel.bufferedAmount === 'number' && rtcChannel.bufferedAmount > MAX_BUFFERED_AMOUNT) {
         await this.waitForBufferDrain(rtcChannel);
       }
 
@@ -449,6 +474,12 @@ export class PeerService {
   }
 
   public cleanup() {
+    if (this.connectRetryTimer) {
+      clearTimeout(this.connectRetryTimer);
+      this.connectRetryTimer = null;
+    }
+    this.connectRetryCount = 0;
+
     if (this.connection) {
       try {
         this.connection.close();
@@ -472,3 +503,4 @@ export class PeerService {
     this.isSending = false;
   }
 }
+

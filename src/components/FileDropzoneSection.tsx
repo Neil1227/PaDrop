@@ -105,6 +105,7 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
   const triggerDownload = (file: TransferFile) => {
     if (!file.blobUrl && !file.blob) return;
 
+    const isTemporaryUrl = !file.blobUrl;
     const url = file.blobUrl || URL.createObjectURL(file.blob!);
     const a = document.createElement('a');
     a.href = url;
@@ -112,6 +113,10 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+
+    if (isTemporaryUrl) {
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
 
     // Optional flair
     try {

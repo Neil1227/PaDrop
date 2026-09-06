@@ -400,7 +400,8 @@ export const ClipboardSection: React.FC<ClipboardSectionProps> = ({
                 onClick={handleSendChat}
                 disabled={!isConnected || !chatInput.trim()}
                 title="Send message"
-                className="p-2.5 rounded-xl bg-signal-gradient hover:opacity-95 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-sm shrink-0"
+                aria-label="Send chat message"
+                className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2.5 rounded-xl bg-signal-gradient hover:opacity-95 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed text-white transition-all shadow-sm shrink-0"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -409,7 +410,8 @@ export const ClipboardSection: React.FC<ClipboardSectionProps> = ({
                 <button
                   onClick={onClearChat}
                   title="Clear chat history"
-                  className="p-2.5 rounded-xl bg-canvas border border-surfaceBorder hover:border-slate-500 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shrink-0"
+                  aria-label="Clear chat history"
+                  className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2.5 rounded-xl bg-canvas border border-surfaceBorder hover:border-slate-500 text-slate-400 hover:text-rose-400 active:scale-95 transition-all shrink-0"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
