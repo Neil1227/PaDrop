@@ -13,11 +13,11 @@ import { PeerService } from './services/peerService';
 import { discoveryService } from './services/discoveryService';
 import type { ConnectionState, TransferFile, ActiveTransfer, ChatMessage, IncomingTransferRequest, IncomingConnectionRequest } from './types';
 
-// Helper to generate 6-character clean room ID
+// Helper to generate 4-character clean room ID for easy memorization
 function generateRoomId(): string {
   const chars = '23456789abcdefghjkmnpqrstuvwxyz'; // readable characters without ambiguity
   let id = '';
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 4; i++) {
     id += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return id;

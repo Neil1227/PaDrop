@@ -243,7 +243,7 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
                           Connect to Receiver's Code
                         </h3>
                         <p className="text-[11px] text-slate-400">
-                          Join manually using the 6-character room code from the Receiver
+                          Join manually using the 4-character room code from the Receiver
                         </p>
                       </div>
                     </div>
@@ -255,7 +255,7 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
                           type="text"
                           value={manualRoomInput}
                           onChange={(e) => setManualRoomInput(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''))}
-                          placeholder="Enter 6-char Receiver Code (e.g. ab3k9x)"
+                          placeholder="Enter 4-char Receiver Code (e.g. 3k9x)"
                           maxLength={8}
                           className="w-full min-h-[44px] px-3.5 py-2.5 rounded-xl bg-canvas border border-surfaceBorder focus:border-signalEnd focus:outline-none text-sm font-mono text-white placeholder:text-slate-500 tracking-wider uppercase transition-colors"
                         />
