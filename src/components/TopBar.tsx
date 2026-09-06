@@ -30,7 +30,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   return (
-    <header className="w-full border-b border-surfaceBorder bg-surface/90 backdrop-blur-md sticky top-0 z-40">
+    <header className="w-full border-b border-surfaceBorder bg-surface/90 backdrop-blur-md sticky top-0 z-40 pt-safe px-safe">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Logo */}
         <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">

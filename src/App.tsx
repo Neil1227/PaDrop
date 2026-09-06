@@ -211,7 +211,7 @@ export function App() {
       />
 
       {/* Main Container: Strict Single-Page Centered Viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 justify-start">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-safe px-safe flex flex-col gap-6 justify-start">
         {/* Error Alert if any */}
         {errorMessage && (
           <div className="w-full flex items-center justify-between gap-3 p-3.5 rounded-xl bg-rose-950/40 border border-rose-800/60 text-rose-200 text-xs">
@@ -264,7 +264,7 @@ export function App() {
         </div>
 
         {/* Bottom Feature Badges & Status Strip */}
-        <footer className="w-full pt-2 pb-4 border-t border-surfaceBorder/60 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
+        <footer className="w-full pt-2 pb-6 border-t border-surfaceBorder/60 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex items-center gap-1.5 text-slate-400">
               <Lock className="w-3.5 h-3.5 text-cobaltLight" />
