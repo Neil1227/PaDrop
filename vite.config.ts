@@ -5,6 +5,19 @@ import os from 'os'
 
 function getLocalLanIp(): string {
   const nets = os.networkInterfaces();
+  const virtualRegex = /vEthernet|WSL|VirtualBox|VMware|Docker|Tailscale|Loopback|Hyper-V|vboxnet/i;
+  
+  // First pass: look for non-virtual physical/Wi-Fi/Ethernet adapters
+  for (const name of Object.keys(nets)) {
+    if (virtualRegex.test(name)) continue;
+    for (const net of nets[name] || []) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+
+  // Fallback pass: any non-internal IPv4 if no physical match
   for (const name of Object.keys(nets)) {
     for (const net of nets[name] || []) {
       if (net.family === 'IPv4' && !net.internal) {
@@ -123,9 +136,9 @@ function discoveryServerPlugin(): Plugin {
   };
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   define: {
-    __LOCAL_LAN_IP__: JSON.stringify(getLocalLanIp()),
+    __LOCAL_LAN_IP__: JSON.stringify(command === 'serve' ? getLocalLanIp() : ''),
   },
   server: {
     host: true,
@@ -181,4 +194,5 @@ export default defineConfig({
       },
     }),
   ],
-})
+}))
+

@@ -26,21 +26,24 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
   const isLocalhost = typeof window !== 'undefined' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-  const defaultLanIp = (typeof __LOCAL_LAN_IP__ !== 'undefined' && __LOCAL_LAN_IP__) ? __LOCAL_LAN_IP__ : '';
+  const defaultLanIp = (isLocalhost && typeof __LOCAL_LAN_IP__ !== 'undefined' && __LOCAL_LAN_IP__) ? __LOCAL_LAN_IP__ : '';
 
   const [lanIp, setLanIp] = useState(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && isLocalhost) {
       const saved = localStorage.getItem('padrop_lan_ip') || localStorage.getItem('peerdrop_lan_ip');
       if (saved) return saved;
-      if (isLocalhost && defaultLanIp) return defaultLanIp;
+      return defaultLanIp;
     }
-    return defaultLanIp;
+    return '';
   });
   const [showLanConfig, setShowLanConfig] = useState(false);
   const [tempLanInput, setTempLanInput] = useState(lanIp || defaultLanIp);
 
-  const effectiveOrigin = lanIp.trim()
-    ? (lanIp.startsWith('http') ? lanIp.trim() : `http://${lanIp.trim()}:5173`)
+  // In production (!isLocalhost), effectiveOrigin ALWAYS uses window.location.origin (e.g. https://padrop.pages.dev)
+  // In localhost development, if lanIp is provided, use it so mobile devices on the same Wi-Fi can reach the dev server
+  const devPort = typeof window !== 'undefined' && window.location.port ? `:${window.location.port}` : ':5173';
+  const effectiveOrigin = (isLocalhost && lanIp.trim())
+    ? (lanIp.startsWith('http') ? lanIp.trim() : `http://${lanIp.trim()}${lanIp.includes(':') ? '' : devPort}`)
     : (typeof window !== 'undefined' ? window.location.origin : '');
 
   const pairUrl = `${effectiveOrigin}/?room=${roomId}&mode=receive`;
