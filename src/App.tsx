@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { ShieldCheck, Zap, Lock, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { PairingSection } from './components/PairingSection';
@@ -315,24 +315,9 @@ export function App() {
           </div>
         </div>
 
-        {/* Responsive Bottom Feature Badges & Status Strip */}
-        <footer className="w-full pt-4 pb-8 sm:pb-6 border-t border-surfaceBorder/60 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 text-xs text-slate-400 text-center md:text-left">
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-[11px] sm:text-xs">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Lock className="w-3.5 h-3.5 text-cobaltLight shrink-0" />
-              <span>End-to-End Encrypted (DTLS/SRTP)</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <Zap className="w-3.5 h-3.5 text-signalStart shrink-0" />
-              <span>64 KB Chunk Streaming Engine</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Zero-Cloud Storage • Direct P2P</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-slate-500 font-mono text-[11px]">
+        {/* Simplified Clean Footer */}
+        <footer className="w-full pt-4 pb-8 sm:pb-6 border-t border-surfaceBorder/60 flex items-center justify-center text-center text-slate-500 font-mono text-[11px] sm:text-xs">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2">
             <span>Developed by <strong className="text-slate-300 font-semibold">Neil Patrick Acierto</strong></span>
             <span className="hidden sm:inline text-slate-600">•</span>
             <span>PaDrop v1.0 • Modern Web PWA</span>
