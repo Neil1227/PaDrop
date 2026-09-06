@@ -117,16 +117,10 @@ export const NearbySharePanel: React.FC<NearbySharePanelProps> = ({
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-white tracking-tight">
-                Nearby Share Radar
-              </h3>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-500/40 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                Live Auto-Discovery
-              </span>
-            </div>
+          <div className="flex flex-col text-left">
+            <h3 className="text-sm font-bold text-white tracking-tight">
+              Nearby Share Radar
+            </h3>
             <p className="text-[11px] text-slate-400">
               Discovers online PaDrop senders automatically
             </p>

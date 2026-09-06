@@ -361,13 +361,13 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
       {activeTab === 'receive' && (
         <div className="w-full flex flex-col gap-5 animate-fadeIn">
           {/* Hero In-App Camera Scanner Action Card */}
-          <div className="w-full bg-surface border border-cobalt/40 rounded-2xl p-5 shadow-surface-elevated flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-cobalt/20 border border-cobalt/40 text-blue-400 flex items-center justify-center shrink-0 shadow-inner">
-                <Camera className="w-6 h-6" />
+          <div className="w-full bg-surface border border-cobalt/40 rounded-2xl p-4 sm:p-5 shadow-surface-elevated flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5 w-full sm:w-auto">
+              <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-cobalt/20 border border-cobalt/40 text-blue-400 flex items-center justify-center shrink-0 shadow-inner">
+                <Camera className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div className="flex flex-col text-center sm:text-left">
-                <h3 className="text-base font-bold text-white tracking-tight">
+              <div className="flex flex-col text-left">
+                <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
                   In-App Camera QR Scanner
                 </h3>
                 <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
