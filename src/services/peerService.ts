@@ -86,7 +86,26 @@ export class PeerService {
       });
 
       this.peer.on('connection', (conn) => {
-        // Host accepts incoming connection
+        // Room Busy Lock: If host is already actively connected with a peer, reject 3rd-party attempts
+        if (this.connection && this.connection.open && this.connectionState === 'connected') {
+          conn.on('open', () => {
+            try {
+              conn.send({
+                type: 'connection-response',
+                accepted: false,
+                reason: 'Room is busy: An active 1-on-1 session is already in progress.',
+              });
+              setTimeout(() => {
+                try { conn.close(); } catch {}
+              }, 200);
+            } catch {
+              try { conn.close(); } catch {}
+            }
+          });
+          return;
+        }
+
+        // Host accepts incoming connection candidate
         if (this.connection) {
           try {
             this.connection.close();

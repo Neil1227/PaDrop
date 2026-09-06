@@ -74,7 +74,9 @@ export function App() {
         else setErrorMessage(null);
 
         if (mode === 'host') {
-          discoveryService.updateHostStatus(state === 'connected' ? 'connected' : 'available');
+          const isConnected = state === 'connected';
+          discoveryService.updateHostStatus(isConnected ? 'connected' : 'available');
+          discoveryService.updateHostDiscoverable(!isConnected);
         }
 
         if (state === 'connected') {

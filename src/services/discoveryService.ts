@@ -684,11 +684,11 @@ class DiscoveryService {
         for (const [rId, room] of this.discoveredRooms.entries()) {
           const isFresh = now - room.timestamp < ROOM_EXPIRY_THRESHOLD_MS;
           const isNotSelf = !normalizedExclude || rId !== normalizedExclude;
-          const isDiscoverable = room.isDiscoverable;
+          const isAvailable = room.isDiscoverable && room.status !== 'busy' && room.status !== 'connected';
 
-          if (isFresh && isNotSelf && isDiscoverable) {
+          if (isFresh && isNotSelf && isAvailable) {
             activeRooms.push(room);
-          } else if (!isFresh) {
+          } else if (!isFresh || !isAvailable) {
             this.discoveredRooms.delete(rId);
           }
         }
@@ -706,7 +706,8 @@ class DiscoveryService {
     for (const [rId, room] of this.discoveredRooms.entries()) {
       const isFresh = now - room.timestamp < ROOM_EXPIRY_THRESHOLD_MS;
       const isNotSelf = !normalizedExclude || rId !== normalizedExclude;
-      if (isFresh && isNotSelf && room.isDiscoverable) {
+      const isAvailable = room.isDiscoverable && room.status !== 'busy' && room.status !== 'connected';
+      if (isFresh && isNotSelf && isAvailable) {
         activeRooms.push(room);
       }
     }
