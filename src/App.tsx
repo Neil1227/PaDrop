@@ -124,11 +124,12 @@ export function App() {
 
     if (urlRoom && urlRoom.trim().length > 0) {
       initialRoom = urlRoom.trim().toLowerCase();
-      hostMode = urlMode !== 'receive'; // If mode=receive, join as guest; otherwise host
+      // If a room param is passed (e.g. from QR scan or pair link), open as Sender (guest) unless explicitly mode=receive
+      hostMode = urlMode === 'receive';
     } else {
       initialRoom = generateRoomId();
+      // Default fresh view: Receiver mode (generates room QR code and listens for incoming transfers)
       hostMode = true;
-      // Update URL silently without full reload
       const newUrl = `${window.location.pathname}?room=${initialRoom}`;
       window.history.replaceState({}, '', newUrl);
     }
@@ -144,13 +145,12 @@ export function App() {
     };
   }, []);
 
-
   const handleManualJoin = (targetRoomId: string) => {
     const cleaned = targetRoomId.trim().toLowerCase();
     if (!cleaned) return;
     setRoomId(cleaned);
     setIsHost(false);
-    const newUrl = `${window.location.pathname}?room=${cleaned}&mode=receive`;
+    const newUrl = `${window.location.pathname}?room=${cleaned}&mode=send`;
     window.history.replaceState({}, '', newUrl);
     startPeerSession(cleaned, 'receive');
   };
@@ -170,10 +170,12 @@ export function App() {
 
   const handleSwitchRole = (targetMode: 'host' | 'receive') => {
     if (targetMode === 'host') {
+      // Switch to Receive Mode (Receiver Host)
       handleNewRoom();
     } else {
+      // Switch to Send Mode (Sender Scanner)
       setIsHost(false);
-      const newUrl = `${window.location.pathname}?room=${roomId}&mode=receive`;
+      const newUrl = `${window.location.pathname}?room=${roomId}&mode=send`;
       window.history.replaceState({}, '', newUrl);
       startPeerSession(roomId, 'receive');
     }
