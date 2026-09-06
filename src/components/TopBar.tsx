@@ -10,6 +10,7 @@ interface TopBarProps {
   onInstallClick: () => void;
   onNewRoom: () => void;
   onOpenInfo: () => void;
+  onSwitchRole?: (targetMode: 'host' | 'receive') => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -20,6 +21,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onInstallClick,
   onNewRoom,
   onOpenInfo,
+  onSwitchRole,
 }) => {
   const [copied, setCopied] = useState(false);
 
@@ -47,9 +49,25 @@ export const TopBar: React.FC<TopBarProps> = ({
               <span className="text-base sm:text-xl font-extrabold tracking-tight text-white flex items-center">
                 Pa<span className="text-signal-gradient">Drop</span>
               </span>
-              <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cobalt/30 text-blue-300 border border-cobalt/50">
-                {isHost ? 'HOST' : 'RECEIVER'}
-              </span>
+              {onSwitchRole ? (
+                <button
+                  type="button"
+                  onClick={() => onSwitchRole(isHost ? 'receive' : 'host')}
+                  title={`Click to switch to ${isHost ? 'Receiver' : 'Sender'} mode`}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-all active:scale-95 cursor-pointer ${
+                    isHost
+                      ? 'bg-signal-gradient text-white border-transparent shadow-[0_0_10px_rgba(255,24,64,0.35)] hover:opacity-90'
+                      : 'bg-cobalt text-white border-cobaltLight shadow-[0_0_10px_rgba(0,71,171,0.4)] hover:bg-cobaltLight'
+                  }`}
+                >
+                  <span>{isHost ? '📤 SENDER' : '📥 RECEIVER'}</span>
+                  <span className="opacity-75 text-[9px] font-normal underline decoration-dotted">⇄ switch</span>
+                </button>
+              ) : (
+                <span className="hidden md:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cobalt/30 text-blue-300 border border-cobalt/50">
+                  {isHost ? 'HOST' : 'RECEIVER'}
+                </span>
+              )}
             </div>
             <span className="text-[11px] text-slate-400 font-medium hidden lg:block">
               Instant, zero-cloud peer-to-peer clipboard & file drop

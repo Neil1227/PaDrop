@@ -168,6 +168,17 @@ export function App() {
     startPeerSession(newRoom, 'host');
   };
 
+  const handleSwitchRole = (targetMode: 'host' | 'receive') => {
+    if (targetMode === 'host') {
+      handleNewRoom();
+    } else {
+      setIsHost(false);
+      const newUrl = `${window.location.pathname}?room=${roomId}&mode=receive`;
+      window.history.replaceState({}, '', newUrl);
+      startPeerSession(roomId, 'receive');
+    }
+  };
+
   const handleClipboardChange = (newText: string) => {
     setClipboardText(newText);
     if (peerServiceRef.current && connectionState === 'connected') {
@@ -209,6 +220,7 @@ export function App() {
         }}
         onNewRoom={handleNewRoom}
         onOpenInfo={() => setIsInfoOpen(true)}
+        onSwitchRole={handleSwitchRole}
       />
 
       {/* Info / Readme Modal */}
@@ -217,7 +229,7 @@ export function App() {
         onClose={() => setIsInfoOpen(false)}
       />
 
-      {/* PWA Install Banner */}
+      {/* Pwa Install Banner */}
       <PwaInstallBanner
         promptEvent={installPrompt}
         onInstalled={() => setInstallPrompt(null)}
@@ -247,6 +259,7 @@ export function App() {
           connectionState={connectionState}
           isHost={isHost}
           onJoinRoom={handleManualJoin}
+          onSwitchRole={handleSwitchRole}
         />
 
         {/* 2-Column Responsive Dashboard */}
