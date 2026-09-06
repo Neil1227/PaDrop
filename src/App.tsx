@@ -8,9 +8,10 @@ import { ClipboardSection } from './components/ClipboardSection';
 import { FileDropzoneSection } from './components/FileDropzoneSection';
 import { InfoModal } from './components/InfoModal';
 import { TransferConfirmationModal } from './components/TransferConfirmationModal';
+import { ConnectionConfirmationModal } from './components/ConnectionConfirmationModal';
 import { PeerService } from './services/peerService';
 import { discoveryService } from './services/discoveryService';
-import type { ConnectionState, TransferFile, ActiveTransfer, ChatMessage, IncomingTransferRequest } from './types';
+import type { ConnectionState, TransferFile, ActiveTransfer, ChatMessage, IncomingTransferRequest, IncomingConnectionRequest } from './types';
 
 // Helper to generate 6-character clean room ID
 function generateRoomId(): string {
@@ -36,6 +37,7 @@ export function App() {
   const [activeTransfer, setActiveTransfer] = useState<ActiveTransfer | null>(null);
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
   const [pendingTransferRequest, setPendingTransferRequest] = useState<IncomingTransferRequest | null>(null);
+  const [pendingConnectionRequest, setPendingConnectionRequest] = useState<IncomingConnectionRequest | null>(null);
   
   // PWA install prompt event
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -101,6 +103,9 @@ export function App() {
       onTransferRequest: (request) => {
         setPendingTransferRequest(request);
       },
+      onConnectionRequest: (request) => {
+        setPendingConnectionRequest(request);
+      },
       onFileComplete: (completedFile) => {
         setTransferFiles((prev) => [completedFile, ...prev]);
       },
@@ -161,6 +166,7 @@ export function App() {
     setTransferFiles([]);
     setActiveTransfer(null);
     setPendingTransferRequest(null);
+    setPendingConnectionRequest(null);
     const newUrl = `${window.location.pathname}?room=${newRoom}`;
     window.history.replaceState({}, '', newUrl);
     startPeerSession(newRoom, 'host');
@@ -203,6 +209,20 @@ export function App() {
     }
   };
 
+  const handleAcceptConnection = () => {
+    if (peerServiceRef.current) {
+      peerServiceRef.current.acceptConnection();
+    }
+    setPendingConnectionRequest(null);
+  };
+
+  const handleDeclineConnection = () => {
+    if (peerServiceRef.current) {
+      peerServiceRef.current.declineConnection();
+    }
+    setPendingConnectionRequest(null);
+  };
+
   const handleAcceptTransfer = (requestId: string) => {
     if (peerServiceRef.current) {
       peerServiceRef.current.acceptTransfer(requestId);
@@ -223,6 +243,7 @@ export function App() {
     }
     setActiveTransfer(null);
     setPendingTransferRequest(null);
+    setPendingConnectionRequest(null);
   };
 
   return (
@@ -245,6 +266,13 @@ export function App() {
       <InfoModal
         isOpen={isInfoOpen}
         onClose={() => setIsInfoOpen(false)}
+      />
+
+      {/* Connection Approval Modal (Pairing prompt for Receiver) */}
+      <ConnectionConfirmationModal
+        request={pendingConnectionRequest}
+        onAccept={handleAcceptConnection}
+        onDecline={handleDeclineConnection}
       />
 
       {/* Transfer Approval Modal (AirDrop style) */}

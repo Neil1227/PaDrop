@@ -1,5 +1,6 @@
 import { Peer, type DataConnection } from 'peerjs';
-import type { ConnectionState, PeerMessage, TransferFile, ActiveTransfer, ChatMessage, IncomingTransferRequest } from '../types';
+import { getDeviceDisplayName, getDeviceType } from './discoveryService';
+import type { ConnectionState, PeerMessage, TransferFile, ActiveTransfer, ChatMessage, IncomingTransferRequest, IncomingConnectionRequest } from '../types';
 
 const CHUNK_SIZE = 64 * 1024; // 64 KB
 const MAX_BUFFERED_AMOUNT = 512 * 1024; // 512 KB backpressure threshold
@@ -10,6 +11,7 @@ export interface PeerServiceCallbacks {
   onChatMessage: (msg: ChatMessage) => void;
   onTransferProgress: (transfer: ActiveTransfer | null) => void;
   onTransferRequest?: (request: IncomingTransferRequest) => void;
+  onConnectionRequest?: (request: IncomingConnectionRequest) => void;
   onFileComplete: (file: TransferFile) => void;
   onError: (msg: string) => void;
 }
@@ -147,9 +149,21 @@ export class PeerService {
         clearTimeout(this.connectRetryTimer);
         this.connectRetryTimer = null;
       }
-      this.setConnectionState('connected');
-      // Send handshake ping
-      this.sendRaw({ type: 'ping' });
+
+      if (!this.isHost) {
+        // Sender sends connection-request to host and waits for receiver confirmation
+        this.setConnectionState('connecting', 'Waiting for receiver to approve connection...');
+        this.sendRaw({
+          type: 'connection-request',
+          senderId: this.peer?.id || 'sender',
+          senderName: getDeviceDisplayName(),
+          senderDeviceType: getDeviceType(),
+          timestamp: Date.now(),
+        });
+      } else {
+        // Host remains waiting until connection-request arrives and user accepts
+        this.setConnectionState('connecting', 'Incoming connection request from sender...');
+      }
     });
 
     conn.on('data', (data) => {
@@ -545,9 +559,63 @@ export class PeerService {
         break;
       }
 
+      case 'connection-request':
+        if (this.isHost) {
+          this.callbacks.onConnectionRequest?.({
+            senderId: msg.senderId,
+            senderName: msg.senderName,
+            senderDeviceType: msg.senderDeviceType,
+            roomId: this.roomId,
+            timestamp: msg.timestamp,
+          });
+        }
+        break;
+
+      case 'connection-response':
+        if (!this.isHost) {
+          if (msg.accepted) {
+            this.setConnectionState('connected');
+            this.sendRaw({ type: 'ping' });
+          } else {
+            this.setConnectionState('disconnected', msg.reason || 'Connection was declined by the receiver.');
+            if (this.connection) {
+              try {
+                this.connection.close();
+              } catch {
+                // ignore
+              }
+              this.connection = null;
+            }
+          }
+        }
+        break;
+
       case 'file-ack':
         break;
     }
+  }
+
+  public acceptConnection() {
+    this.sendRaw({ type: 'connection-response', accepted: true });
+    this.setConnectionState('connected');
+    this.sendRaw({ type: 'ping' });
+  }
+
+  public declineConnection(reason?: string) {
+    this.sendRaw({
+      type: 'connection-response',
+      accepted: false,
+      reason: reason || 'Connection declined by receiver.',
+    });
+    if (this.connection) {
+      try {
+        this.connection.close();
+      } catch {
+        // ignore
+      }
+      this.connection = null;
+    }
+    this.setConnectionState('waiting');
   }
 
   public disconnect() {

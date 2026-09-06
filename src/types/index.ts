@@ -48,6 +48,20 @@ export interface FileResponseMessage {
   accepted: boolean;
 }
 
+export interface ConnectionRequestMessage {
+  type: 'connection-request';
+  senderId: string;
+  senderName: string;
+  senderDeviceType: DeviceType;
+  timestamp: number;
+}
+
+export interface ConnectionResponseMessage {
+  type: 'connection-response';
+  accepted: boolean;
+  reason?: string;
+}
+
 export interface PingMessage {
   type: 'ping';
 }
@@ -77,9 +91,19 @@ export type PeerMessage =
   | FileAckMessage
   | FileRequestMessage
   | FileResponseMessage
+  | ConnectionRequestMessage
+  | ConnectionResponseMessage
   | PingMessage
   | PongMessage
   | ChatSyncMessage;
+
+export interface IncomingConnectionRequest {
+  senderId: string;
+  senderName: string;
+  senderDeviceType: DeviceType;
+  roomId: string;
+  timestamp: number;
+}
 
 export interface IncomingTransferRequest {
   id: string;
