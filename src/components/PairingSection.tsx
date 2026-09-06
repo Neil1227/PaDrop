@@ -118,9 +118,8 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
               <span className="text-sm font-bold text-white">
                 Direct WebRTC P2P Channel Active
               </span>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${
-                isHost ? 'bg-signal-gradient' : 'bg-cobalt'
-              }`}>
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold text-white ${isHost ? 'bg-signal-gradient' : 'bg-cobalt'
+                }`}>
                 {isHost ? 'SENDER (HOST)' : 'RECEIVER (GUEST)'}
               </span>
             </div>
@@ -169,28 +168,26 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
         <button
           type="button"
           onClick={() => handleTabSwitch('send')}
-          className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-            activeTab === 'send'
+          className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'send'
               ? 'bg-signal-gradient text-white shadow-[0_0_16px_rgba(255,24,64,0.4)] scale-[1.01]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-canvas/50'
-          }`}
+            }`}
         >
           <Send className="w-4 h-4" />
-          <span>📤 Send from this Device</span>
+          <span>Send from this Device</span>
           <span className="hidden sm:inline-block text-[10px] font-normal opacity-80">(Display QR Code)</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleTabSwitch('receive')}
-          className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-            activeTab === 'receive'
+          className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${activeTab === 'receive'
               ? 'bg-cobalt hover:bg-cobaltLight text-white shadow-[0_0_16px_rgba(0,71,171,0.5)] scale-[1.01]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-canvas/50'
-          }`}
+            }`}
         >
           <DownloadCloud className="w-4 h-4" />
-          <span>📥 Receive on this Device</span>
+          <span>Receive on this Device</span>
           <span className="hidden sm:inline-block text-[10px] font-normal opacity-80">(Camera Scanner & Radar)</span>
         </button>
       </div>
@@ -255,11 +252,10 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
                     type="button"
                     onClick={() => setIsDiscoverable(!isDiscoverable)}
                     title={isDiscoverable ? 'Device is discoverable to nearby peers' : 'Device is hidden from nearby discovery'}
-                    className={`min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${
-                      isDiscoverable
+                    className={`min-h-[44px] inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium border transition-all ${isDiscoverable
                         ? 'bg-canvas border-emerald-500/40 text-emerald-300 hover:bg-surfaceBorder'
                         : 'bg-canvas border-surfaceBorder text-slate-400 hover:text-slate-200'
-                    }`}
+                      }`}
                   >
                     {isDiscoverable ? (
                       <>
