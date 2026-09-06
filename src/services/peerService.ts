@@ -1,5 +1,5 @@
 import { Peer, type DataConnection } from 'peerjs';
-import type { ConnectionState, PeerMessage, TransferFile, ActiveTransfer, ChatMessage } from '../types';
+import type { ConnectionState, PeerMessage, TransferFile, ActiveTransfer, ChatMessage, IncomingTransferRequest } from '../types';
 
 const CHUNK_SIZE = 64 * 1024; // 64 KB
 const MAX_BUFFERED_AMOUNT = 512 * 1024; // 512 KB backpressure threshold
@@ -9,6 +9,7 @@ export interface PeerServiceCallbacks {
   onTextSync: (text: string) => void;
   onChatMessage: (msg: ChatMessage) => void;
   onTransferProgress: (transfer: ActiveTransfer | null) => void;
+  onTransferRequest?: (request: IncomingTransferRequest) => void;
   onFileComplete: (file: TransferFile) => void;
   onError: (msg: string) => void;
 }
@@ -21,6 +22,9 @@ export class PeerService {
   public roomId: string = '';
   public isHost: boolean = false;
   public connectionState: ConnectionState = 'disconnected';
+
+  // Transfer confirmation state
+  private pendingConfirmations: Map<string, { resolve: (accepted: boolean) => void }> = new Map();
 
   // Receiving state
   private incomingFiles: Map<string, {
@@ -209,6 +213,22 @@ export class PeerService {
     }
   }
 
+  public acceptTransfer(fileId: string) {
+    this.sendRaw({
+      type: 'file-response',
+      id: fileId,
+      accepted: true,
+    });
+  }
+
+  public declineTransfer(fileId: string) {
+    this.sendRaw({
+      type: 'file-response',
+      id: fileId,
+      accepted: false,
+    });
+  }
+
   private async processSendQueue() {
     if (this.sendQueue.length === 0 || !this.connection || !this.connection.open) {
       this.isSending = false;
@@ -221,7 +241,54 @@ export class PeerService {
     const fileId = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
     const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
 
-    // Announce file start
+    // 1. Send Transfer Request to Receiver for Confirmation
+    this.sendRaw({
+      type: 'file-request',
+      id: fileId,
+      name: file.name,
+      size: file.size,
+      mimeType: file.type || 'application/octet-stream',
+    });
+
+    const activeTransfer: ActiveTransfer = {
+      fileId,
+      fileName: file.name,
+      fileSize: file.size,
+      bytesTransferred: 0,
+      progress: 0,
+      speed: 0,
+      direction: 'send',
+      startTime: Date.now(),
+      isPendingConfirmation: true,
+    };
+
+    this.callbacks.onTransferProgress(activeTransfer);
+
+    // 2. Await Receiver's Acceptance or Decline
+    const accepted = await new Promise<boolean>((resolve) => {
+      const timeout = setTimeout(() => {
+        this.pendingConfirmations.delete(fileId);
+        resolve(false);
+      }, 60000); // 60s timeout
+
+      this.pendingConfirmations.set(fileId, {
+        resolve: (result) => {
+          clearTimeout(timeout);
+          resolve(result);
+        },
+      });
+    });
+
+    if (!accepted) {
+      this.callbacks.onError(`Transfer for "${file.name}" was declined by receiver.`);
+      this.callbacks.onTransferProgress(null);
+      this.isSending = false;
+      await new Promise((r) => setTimeout(r, 100));
+      this.processSendQueue();
+      return;
+    }
+
+    // 3. Announce file start and begin streaming
     this.sendRaw({
       type: 'file-start',
       id: fileId,
@@ -236,17 +303,8 @@ export class PeerService {
     let lastCalcBytes = 0;
     let currentSpeed = 0;
 
-    const activeTransfer: ActiveTransfer = {
-      fileId,
-      fileName: file.name,
-      fileSize: file.size,
-      bytesTransferred: 0,
-      progress: 0,
-      speed: 0,
-      direction: 'send',
-      startTime,
-    };
-
+    activeTransfer.isPendingConfirmation = false;
+    activeTransfer.startTime = startTime;
     this.callbacks.onTransferProgress(activeTransfer);
 
     // Chunking stream
@@ -465,6 +523,25 @@ export class PeerService {
 
         // Send ACK
         this.sendRaw({ type: 'file-ack', id: msg.id });
+        break;
+      }
+
+      case 'file-request':
+        this.callbacks.onTransferRequest?.({
+          id: msg.id,
+          name: msg.name,
+          size: msg.size,
+          mimeType: msg.mimeType,
+          timestamp: Date.now(),
+        });
+        break;
+
+      case 'file-response': {
+        const entry = this.pendingConfirmations.get(msg.id);
+        if (entry) {
+          this.pendingConfirmations.delete(msg.id);
+          entry.resolve(msg.accepted);
+        }
         break;
       }
 

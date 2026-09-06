@@ -15,6 +15,7 @@ import {
   Send,
   Plus,
   Trash2,
+  Clock,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { TransferFile, ActiveTransfer, ConnectionState } from '../types';
@@ -399,7 +400,12 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
         <div className="mt-4 p-4 rounded-xl bg-canvas border border-surfaceBorder flex flex-col gap-2.5 shadow-sm animate-pulse-glow">
           <div className="flex items-center justify-between gap-3 text-xs">
             <div className="flex items-center gap-2 truncate">
-              {activeTransfer.direction === 'send' ? (
+              {activeTransfer.isPendingConfirmation ? (
+                <span className="flex items-center gap-1.5 text-amber-400 font-semibold animate-pulse">
+                  <Clock className="w-3.5 h-3.5" />
+                  Waiting for receiver to accept…
+                </span>
+              ) : activeTransfer.direction === 'send' ? (
                 <span className="flex items-center gap-1 text-signalStart font-semibold">
                   <ArrowUpRight className="w-3.5 h-3.5" />
                   Sending:
@@ -416,25 +422,41 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
             </div>
 
             <div className="flex items-center gap-2 font-mono text-slate-300 shrink-0">
-              <span>{formatSpeed(activeTransfer.speed)}</span>
-              <span>•</span>
-              <span className="font-bold text-signalEnd">{activeTransfer.progress}%</span>
+              {activeTransfer.isPendingConfirmation ? (
+                <span className="text-amber-400 font-medium">Pending Approval</span>
+              ) : (
+                <>
+                  <span>{formatSpeed(activeTransfer.speed)}</span>
+                  <span>•</span>
+                  <span className="font-bold text-signalEnd">{activeTransfer.progress}%</span>
+                </>
+              )}
             </div>
           </div>
 
           {/* Kinetic Progress Bar Fill */}
           <div className="w-full h-2.5 rounded-full bg-surfaceBorder overflow-hidden relative">
             <div
-              className="h-full bg-signal-gradient transition-all duration-150 rounded-full shadow-[0_0_10px_#FF1840]"
-              style={{ width: `${Math.max(3, activeTransfer.progress)}%` }}
+              className={`h-full transition-all duration-150 rounded-full ${
+                activeTransfer.isPendingConfirmation
+                  ? 'bg-amber-400/80 animate-pulse'
+                  : 'bg-signal-gradient shadow-[0_0_10px_#FF1840]'
+              }`}
+              style={{ width: `${activeTransfer.isPendingConfirmation ? 100 : Math.max(3, activeTransfer.progress)}%` }}
             />
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
             <span>
-              {formatBytes(activeTransfer.bytesTransferred)} / {formatBytes(activeTransfer.fileSize)}
+              {activeTransfer.isPendingConfirmation
+                ? `File Size: ${formatBytes(activeTransfer.fileSize)}`
+                : `${formatBytes(activeTransfer.bytesTransferred)} / ${formatBytes(activeTransfer.fileSize)}`}
             </span>
-            <span>64 KB Chunks Streaming</span>
+            <span>
+              {activeTransfer.isPendingConfirmation
+                ? 'Prompt sent to receiver'
+                : '64 KB Chunks Streaming'}
+            </span>
           </div>
         </div>
       )}

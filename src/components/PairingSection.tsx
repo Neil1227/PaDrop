@@ -2,9 +2,7 @@ import React, { useState, useEffect, type FormEvent } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Check,
-  QrCode,
   Link2,
-  ShieldCheck,
   ArrowRight,
   Radio,
   Eye,
@@ -37,7 +35,6 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
   const [activeTab, setActiveTab] = useState<'send' | 'receive'>(isHost ? 'receive' : 'send');
   const [copiedLink, setCopiedLink] = useState(false);
   const [manualRoomInput, setManualRoomInput] = useState('');
-  const [isQrExpanded, setIsQrExpanded] = useState(false);
   const [isDiscoverable, setIsDiscoverable] = useState(true);
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
 
@@ -103,66 +100,6 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
   };
 
   const isConnected = connectionState === 'connected';
-
-  // Compact Linked status chip when connected
-  if (isConnected && !isQrExpanded) {
-    return (
-      <section className="w-full bg-surface border border-surfaceBorder rounded-2xl p-3 sm:p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3 transition-all duration-300">
-        <div className="flex items-center gap-2.5 sm:gap-3">
-          <div className="relative flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-canvas border border-emerald-500/30 text-emerald-400 shrink-0">
-            <ShieldCheck className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="absolute -top-1 -right-1 flex h-2 w-2 sm:h-2.5 sm:w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-signalEnd opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 sm:h-2.5 sm:w-2.5 bg-signal-gradient"></span>
-            </span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-xs sm:text-sm font-bold text-white">
-                Direct WebRTC Channel Active
-              </span>
-              <span className={`px-1.5 py-0.5 rounded-md text-[9px] font-mono font-bold tracking-wider uppercase text-white shadow-xs ${
-                isHost ? 'bg-cobalt' : 'bg-signal-gradient'
-              }`}>
-                {isHost ? 'RECEIVER' : 'SENDER'}
-              </span>
-            </div>
-            <p className="text-[11px] sm:text-xs text-slate-400">
-              Room <span className="font-mono text-slate-200 font-semibold">{roomId}</span> • Real-time clipboard & 64KB chunked file streaming
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setIsQrExpanded(true)}
-            className="min-h-[38px] sm:min-h-[44px] flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl bg-canvas hover:bg-surfaceBorder border border-surfaceBorder text-slate-300 hover:text-white text-xs font-medium transition-colors"
-          >
-            <QrCode className="w-3.5 h-3.5 text-cobaltLight" />
-            <span>Show QR</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="min-h-[38px] sm:min-h-[44px] flex items-center gap-1.5 px-3.5 py-1.5 sm:py-2 rounded-xl bg-canvas hover:bg-surfaceBorder border border-surfaceBorder text-slate-300 hover:text-white text-xs font-medium transition-colors"
-          >
-            {copiedLink ? (
-              <>
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400 font-semibold">Copied!</span>
-              </>
-            ) : (
-              <>
-                <Link2 className="w-3.5 h-3.5 text-slate-400" />
-                <span>Pair Link</span>
-              </>
-            )}
-          </button>
-        </div>
-      </section>
-    );
-  }
 
   // Expanded / Role Selection Pairing Section
   return (
@@ -313,7 +250,7 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
               </div>
 
               <div className="flex flex-col gap-2 text-center sm:text-left max-w-md">
-                <div className="flex items-center justify-center sm:justify-start gap-2">
+                <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                   <span className="flex h-2.5 w-2.5 relative">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cobalt"></span>
@@ -321,8 +258,11 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
                   <h2 className="text-base font-bold text-white tracking-tight">
                     Show QR to Sender
                   </h2>
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-cobalt text-white">
-                    Receiver Mode
+                  <span className="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cobalt text-white shadow-xs tracking-wider uppercase">
+                    RECEIVER
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-canvas border border-surfaceBorder text-slate-300">
+                    {roomId}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 leading-relaxed">
@@ -372,16 +312,6 @@ export const PairingSection: React.FC<PairingSectionProps> = ({
                       </>
                     )}
                   </button>
-
-                  {isConnected && (
-                    <button
-                      type="button"
-                      onClick={() => setIsQrExpanded(false)}
-                      className="min-h-[44px] px-3.5 py-2 rounded-xl bg-canvas border border-surfaceBorder text-slate-400 hover:text-white text-xs font-medium transition-colors"
-                    >
-                      Minimize
-                    </button>
-                  )}
                 </div>
 
                 {/* LAN Wi-Fi helper if host is viewed on localhost */}

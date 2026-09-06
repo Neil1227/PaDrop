@@ -7,9 +7,10 @@ import { PairingSection } from './components/PairingSection';
 import { ClipboardSection } from './components/ClipboardSection';
 import { FileDropzoneSection } from './components/FileDropzoneSection';
 import { InfoModal } from './components/InfoModal';
+import { TransferConfirmationModal } from './components/TransferConfirmationModal';
 import { PeerService } from './services/peerService';
 import { discoveryService } from './services/discoveryService';
-import type { ConnectionState, TransferFile, ActiveTransfer, ChatMessage } from './types';
+import type { ConnectionState, TransferFile, ActiveTransfer, ChatMessage, IncomingTransferRequest } from './types';
 
 // Helper to generate 6-character clean room ID
 function generateRoomId(): string {
@@ -33,17 +34,14 @@ export function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [transferFiles, setTransferFiles] = useState<TransferFile[]>([]);
   const [activeTransfer, setActiveTransfer] = useState<ActiveTransfer | null>(null);
-
-  // PWA install state
-  const [installPrompt, setInstallPrompt] = useState<any | null>(null);
-
-  // Info Modal state
   const [isInfoOpen, setIsInfoOpen] = useState<boolean>(false);
+  const [pendingTransferRequest, setPendingTransferRequest] = useState<IncomingTransferRequest | null>(null);
+  
+  // PWA install prompt event
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
 
-  // Peer service ref
   const peerServiceRef = useRef<PeerService | null>(null);
 
-  // Handle beforeinstallprompt
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
@@ -78,7 +76,6 @@ export function App() {
         }
 
         if (state === 'connected') {
-          // Trigger delightful celebratory confetti!
           try {
             confetti({
               particleCount: 50,
@@ -101,6 +98,9 @@ export function App() {
       onTransferProgress: (transfer) => {
         setActiveTransfer(transfer);
       },
+      onTransferRequest: (request) => {
+        setPendingTransferRequest(request);
+      },
       onFileComplete: (completedFile) => {
         setTransferFiles((prev) => [completedFile, ...prev]);
       },
@@ -113,7 +113,6 @@ export function App() {
     service.init(rId, mode);
   };
 
-  // Initialize Room & View detection
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const urlRoom = searchParams.get('room');
@@ -124,11 +123,9 @@ export function App() {
 
     if (urlRoom && urlRoom.trim().length > 0) {
       initialRoom = urlRoom.trim().toLowerCase();
-      // If a room param is passed (e.g. from QR scan or pair link), open as Sender (guest) unless explicitly mode=receive
       hostMode = urlMode === 'receive';
     } else {
       initialRoom = generateRoomId();
-      // Default fresh view: Receiver mode (generates room QR code and listens for incoming transfers)
       hostMode = true;
       const newUrl = `${window.location.pathname}?room=${initialRoom}`;
       window.history.replaceState({}, '', newUrl);
@@ -163,6 +160,7 @@ export function App() {
     setChatMessages([]);
     setTransferFiles([]);
     setActiveTransfer(null);
+    setPendingTransferRequest(null);
     const newUrl = `${window.location.pathname}?room=${newRoom}`;
     window.history.replaceState({}, '', newUrl);
     startPeerSession(newRoom, 'host');
@@ -170,10 +168,8 @@ export function App() {
 
   const handleSwitchRole = (targetMode: 'host' | 'receive') => {
     if (targetMode === 'host') {
-      // Switch to Receive Mode (Receiver Host)
       handleNewRoom();
     } else {
-      // Switch to Send Mode (Sender Scanner)
       setIsHost(false);
       const newUrl = `${window.location.pathname}?room=${roomId}&mode=send`;
       window.history.replaceState({}, '', newUrl);
@@ -207,6 +203,20 @@ export function App() {
     }
   };
 
+  const handleAcceptTransfer = (requestId: string) => {
+    if (peerServiceRef.current) {
+      peerServiceRef.current.acceptTransfer(requestId);
+    }
+    setPendingTransferRequest(null);
+  };
+
+  const handleDeclineTransfer = (requestId: string) => {
+    if (peerServiceRef.current) {
+      peerServiceRef.current.declineTransfer(requestId);
+    }
+    setPendingTransferRequest(null);
+  };
+
   return (
     <div className="min-h-screen bg-canvas bg-canvas-gradient flex flex-col selection:bg-signalEnd selection:text-white">
       {/* Top Bar */}
@@ -227,6 +237,13 @@ export function App() {
       <InfoModal
         isOpen={isInfoOpen}
         onClose={() => setIsInfoOpen(false)}
+      />
+
+      {/* Transfer Approval Modal (AirDrop style) */}
+      <TransferConfirmationModal
+        request={pendingTransferRequest}
+        onAccept={handleAcceptTransfer}
+        onDecline={handleDeclineTransfer}
       />
 
       {/* Pwa Install Banner */}
@@ -289,24 +306,24 @@ export function App() {
           </div>
         </div>
 
-        {/* Bottom Feature Badges & Status Strip */}
-        <footer className="w-full pt-2 pb-6 border-t border-surfaceBorder/60 flex flex-wrap items-center justify-between gap-4 text-xs text-slate-400">
-          <div className="flex flex-wrap items-center gap-4">
+        {/* Responsive Bottom Feature Badges & Status Strip */}
+        <footer className="w-full pt-4 pb-8 sm:pb-6 border-t border-surfaceBorder/60 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4 text-xs text-slate-400 text-center md:text-left">
+          <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 text-[11px] sm:text-xs">
             <div className="flex items-center gap-1.5 text-slate-400">
-              <Lock className="w-3.5 h-3.5 text-cobaltLight" />
+              <Lock className="w-3.5 h-3.5 text-cobaltLight shrink-0" />
               <span>End-to-End Encrypted (DTLS/SRTP)</span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-400">
-              <Zap className="w-3.5 h-3.5 text-signalStart" />
+              <Zap className="w-3.5 h-3.5 text-signalStart shrink-0" />
               <span>64 KB Chunk Streaming Engine</span>
             </div>
             <div className="flex items-center gap-1.5 text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
               <span>Zero-Cloud Storage • Direct P2P</span>
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2.5 text-slate-500 font-mono text-[11px]">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 text-slate-500 font-mono text-[11px]">
             <span>Developed by <strong className="text-slate-300 font-semibold">Neil Patrick Acierto</strong></span>
             <span className="hidden sm:inline text-slate-600">•</span>
             <span>PaDrop v1.0 • Modern Web PWA</span>

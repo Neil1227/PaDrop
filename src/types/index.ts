@@ -34,6 +34,20 @@ export interface FileAckMessage {
   id: string;
 }
 
+export interface FileRequestMessage {
+  type: 'file-request';
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string;
+}
+
+export interface FileResponseMessage {
+  type: 'file-response';
+  id: string;
+  accepted: boolean;
+}
+
 export interface PingMessage {
   type: 'ping';
 }
@@ -61,9 +75,19 @@ export type PeerMessage =
   | FileChunkMessage
   | FileEndMessage
   | FileAckMessage
+  | FileRequestMessage
+  | FileResponseMessage
   | PingMessage
   | PongMessage
   | ChatSyncMessage;
+
+export interface IncomingTransferRequest {
+  id: string;
+  name: string;
+  size: number;
+  mimeType: string;
+  timestamp: number;
+}
 
 export interface TransferFile {
   id: string;
@@ -90,6 +114,7 @@ export interface ActiveTransfer {
   speed: number; // bytes/sec
   direction: 'send' | 'receive';
   startTime: number;
+  isPendingConfirmation?: boolean;
 }
 
 export type DeviceType = 'desktop' | 'mobile' | 'tablet';
