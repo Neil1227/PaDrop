@@ -1,9 +1,17 @@
+import mqtt, { type MqttClient } from 'mqtt';
 import type { DiscoveredRoom, DeviceType, RoomStatus, DiscoveryMessage, DiscoveryAnnouncement } from '../types';
 
 const DISCOVERY_CHANNEL_NAME = 'padrop_discovery_channel_v1';
 const STORAGE_REGISTRY_KEY = 'padrop_active_hosts_registry';
-const HEARTBEAT_INTERVAL_MS = 4000;
-const ROOM_EXPIRY_THRESHOLD_MS = 15000;
+const HEARTBEAT_INTERVAL_MS = 3000;
+const ROOM_EXPIRY_THRESHOLD_MS = 12000;
+const MQTT_DISCOVERY_TOPIC = 'padrop/v1/radar/presence';
+
+// Public high-speed WebSocket MQTT brokers for cross-network WebRTC presence
+const MQTT_BROKERS = [
+  'wss://broker.emqx.io:8084/mqtt',
+  'wss://broker.hivemq.com:8884/mqtt',
+];
 
 export function getDeviceType(): DeviceType {
   if (typeof window === 'undefined') return 'desktop';
@@ -52,12 +60,21 @@ export interface BroadcastHostOptions {
 class DiscoveryService {
   private broadcastChannel: BroadcastChannel | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private pruneTimer: ReturnType<typeof setInterval> | null = null;
   private currentHostState: BroadcastHostOptions | null = null;
   private discoveredRooms: Map<string, DiscoveredRoom> = new Map();
   private subscribers: Set<(rooms: DiscoveredRoom[]) => void> = new Set();
+  
+  // MQTT Mesh State
+  private mqttClient: MqttClient | null = null;
+  private isMqttConnected: boolean = false;
+  private currentBrokerIndex: number = 0;
+  private isMqttConnecting: boolean = false;
 
   constructor() {
     this.initChannel();
+    this.initMqtt();
+    this.startAutoPruner();
   }
 
   private initChannel() {
@@ -72,7 +89,7 @@ class DiscoveryService {
       console.warn('DiscoveryService: BroadcastChannel not supported', err);
     }
 
-    // Also listen to storage events for cross-tab synchronization fallback
+    // Cross-tab storage fallback
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
         if (e.key === STORAGE_REGISTRY_KEY && e.newValue) {
@@ -85,6 +102,101 @@ class DiscoveryService {
         }
       });
     }
+  }
+
+  private initMqtt() {
+    if (typeof window === 'undefined' || this.isMqttConnecting || (this.mqttClient && this.isMqttConnected)) {
+      return;
+    }
+
+    this.isMqttConnecting = true;
+    const brokerUrl = MQTT_BROKERS[this.currentBrokerIndex % MQTT_BROKERS.length];
+    const clientId = `padrop-${Math.random().toString(36).substring(2, 9)}`;
+
+    try {
+      const mqttModule = mqtt as any;
+      const connectFn = typeof mqttModule?.connect === 'function'
+        ? mqttModule.connect
+        : typeof mqttModule?.default?.connect === 'function'
+        ? mqttModule.default.connect
+        : typeof mqttModule?.default === 'function'
+        ? mqttModule.default
+        : null;
+
+      if (!connectFn) {
+        this.isMqttConnecting = false;
+        return;
+      }
+
+      const client = connectFn(brokerUrl, {
+        clientId,
+        clean: true,
+        connectTimeout: 5000,
+        reconnectPeriod: 4000,
+        keepalive: 30,
+      });
+
+      this.mqttClient = client;
+
+      client.on('connect', () => {
+        this.isMqttConnected = true;
+        this.isMqttConnecting = false;
+
+        client.subscribe(MQTT_DISCOVERY_TOPIC, { qos: 0 }, (err: Error | null) => {
+          if (err) {
+            console.warn('MQTT subscribe error:', err);
+          } else {
+            // If we are currently a discoverable host, announce right away
+            if (this.currentHostState && this.currentHostState.isDiscoverable) {
+              this.publishMqttAnnouncement();
+            }
+          }
+        });
+      });
+
+      client.on('message', (_topic: string, message: Buffer | string) => {
+        try {
+          const parsed = JSON.parse(message.toString());
+          this.handleIncomingMessage(parsed);
+        } catch {
+          // ignore corrupted payload
+        }
+      });
+
+      client.on('error', (err: Error) => {
+        console.warn('MQTT connection warning:', err?.message || err);
+      });
+
+      client.on('close', () => {
+        this.isMqttConnected = false;
+      });
+
+      client.on('offline', () => {
+        this.isMqttConnected = false;
+        // Try fallback broker on subsequent reconnection if persistent
+        this.currentBrokerIndex++;
+      });
+    } catch (err) {
+      this.isMqttConnecting = false;
+      console.warn('Failed to initialize MQTT presence mesh:', err);
+    }
+  }
+
+  private startAutoPruner() {
+    if (this.pruneTimer) return;
+    this.pruneTimer = setInterval(() => {
+      const now = Date.now();
+      let hasChanges = false;
+      for (const [rId, room] of this.discoveredRooms.entries()) {
+        if (now - room.timestamp > ROOM_EXPIRY_THRESHOLD_MS) {
+          this.discoveredRooms.delete(rId);
+          hasChanges = true;
+        }
+      }
+      if (hasChanges) {
+        this.notifySubscribers();
+      }
+    }, 3000);
   }
 
   private syncFromRegistry(registry: Record<string, DiscoveredRoom>) {
@@ -112,29 +224,33 @@ class DiscoveryService {
 
     switch (msg.type) {
       case 'discovery-announce': {
+        const cleanedRoomId = msg.roomId?.toLowerCase()?.trim();
+        if (!cleanedRoomId) return;
+
         if (!msg.isDiscoverable) {
-          if (this.discoveredRooms.delete(msg.roomId.toLowerCase())) {
+          if (this.discoveredRooms.delete(cleanedRoomId)) {
             this.notifySubscribers();
           }
           return;
         }
 
         const room: DiscoveredRoom = {
-          roomId: msg.roomId.toLowerCase(),
-          displayName: msg.displayName || `Host ${msg.roomId}`,
-          deviceType: msg.deviceType,
-          status: msg.status,
+          roomId: cleanedRoomId,
+          displayName: msg.displayName || `Host ${cleanedRoomId}`,
+          deviceType: msg.deviceType || 'desktop',
+          status: msg.status || 'available',
           timestamp: msg.timestamp || Date.now(),
-          isDiscoverable: msg.isDiscoverable,
+          isDiscoverable: true,
           lanIp: msg.lanIp,
         };
 
-        this.discoveredRooms.set(msg.roomId.toLowerCase(), room);
+        this.discoveredRooms.set(cleanedRoomId, room);
         this.notifySubscribers();
         break;
       }
 
       case 'discovery-query': {
+        // If we are currently a discoverable host, respond with an announcement
         if (this.currentHostState && this.currentHostState.isDiscoverable) {
           this.broadcastAnnouncement();
         }
@@ -142,12 +258,38 @@ class DiscoveryService {
       }
 
       case 'discovery-tombstone': {
-        if (this.discoveredRooms.delete(msg.roomId.toLowerCase())) {
-          this.notifySubscribers();
+        const cleanedRoomId = msg.roomId?.toLowerCase()?.trim();
+        if (cleanedRoomId) {
+          if (this.discoveredRooms.delete(cleanedRoomId)) {
+            this.notifySubscribers();
+          }
+          this.removeFromStorageRegistry(cleanedRoomId);
         }
-        this.removeFromStorageRegistry(msg.roomId);
         break;
       }
+    }
+  }
+
+  private publishMqttAnnouncement() {
+    if (!this.mqttClient || !this.isMqttConnected || !this.currentHostState || !this.currentHostState.isDiscoverable) {
+      return;
+    }
+
+    const payload: DiscoveryAnnouncement = {
+      type: 'discovery-announce',
+      roomId: this.currentHostState.roomId.toLowerCase(),
+      displayName: this.currentHostState.displayName || getDeviceDisplayName(),
+      deviceType: getDeviceType(),
+      status: this.currentHostState.status || 'available',
+      timestamp: Date.now(),
+      isDiscoverable: true,
+      lanIp: this.currentHostState.lanIp,
+    };
+
+    try {
+      this.mqttClient.publish(MQTT_DISCOVERY_TOPIC, JSON.stringify(payload), { qos: 0 });
+    } catch {
+      // ignore
     }
   }
 
@@ -161,18 +303,21 @@ class DiscoveryService {
       deviceType: getDeviceType(),
       status: this.currentHostState.status || 'available',
       timestamp: Date.now(),
-      isDiscoverable: !!this.currentHostState.isDiscoverable,
+      isDiscoverable: true,
       lanIp: this.currentHostState.lanIp,
     };
 
-    // 1. Send via local BroadcastChannel
+    // 1. Send via Global Realtime MQTT WebSocket Mesh
+    this.publishMqttAnnouncement();
+
+    // 2. Send via local BroadcastChannel (cross-tab)
     try {
       this.broadcastChannel?.postMessage(announcement);
     } catch {
       // ignore
     }
 
-    // 2. Persist to shared localStorage registry
+    // 3. Persist to shared localStorage registry
     this.updateStorageRegistry({
       roomId: announcement.roomId,
       displayName: announcement.displayName,
@@ -183,7 +328,7 @@ class DiscoveryService {
       lanIp: announcement.lanIp,
     });
 
-    // 3. Network Discovery Announce via HTTP endpoint (LAN / Wi-Fi IP)
+    // 4. Network Discovery Announce via HTTP endpoint (LAN / Dev Server / Cloudflare Functions)
     if (typeof window !== 'undefined') {
       try {
         await fetch('/api/discovery/announce', {
@@ -192,7 +337,7 @@ class DiscoveryService {
           body: JSON.stringify(announcement),
         });
       } catch {
-        // Network offline or static host without backend
+        // Network offline or static host
       }
     }
   }
@@ -213,7 +358,7 @@ class DiscoveryService {
       registry[room.roomId.toLowerCase()] = room;
       localStorage.setItem(STORAGE_REGISTRY_KEY, JSON.stringify(registry));
     } catch {
-      // Storage access may be restricted
+      // ignore
     }
   }
 
@@ -242,10 +387,13 @@ class DiscoveryService {
       ...options,
     };
 
+    // Make sure MQTT is connected
+    this.initMqtt();
+
     // Immediate announcement
     this.broadcastAnnouncement();
 
-    // Periodic heartbeat
+    // Periodic heartbeat to keep presence fresh across all channels
     this.heartbeatTimer = setInterval(() => {
       this.broadcastAnnouncement();
     }, HEARTBEAT_INTERVAL_MS);
@@ -273,7 +421,23 @@ class DiscoveryService {
   }
 
   private sendTombstone(roomId: string) {
-    const cleaned = roomId.toLowerCase();
+    const cleaned = roomId.toLowerCase().trim();
+    if (!cleaned) return;
+
+    // 1. MQTT Tombstone
+    if (this.mqttClient && this.isMqttConnected) {
+      try {
+        this.mqttClient.publish(
+          MQTT_DISCOVERY_TOPIC,
+          JSON.stringify({ type: 'discovery-tombstone', roomId: cleaned, timestamp: Date.now() }),
+          { qos: 0 }
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. BroadcastChannel Tombstone
     try {
       this.broadcastChannel?.postMessage({
         type: 'discovery-tombstone',
@@ -286,6 +450,7 @@ class DiscoveryService {
 
     this.removeFromStorageRegistry(cleaned);
 
+    // 3. HTTP Tombstone
     if (typeof window !== 'undefined') {
       try {
         fetch('/api/discovery/tombstone', {
@@ -311,18 +476,61 @@ class DiscoveryService {
     }
   }
 
+  public queryPeers() {
+    const queryMsg: DiscoveryMessage = {
+      type: 'discovery-query',
+      scannerId: `scan-${Math.random().toString(36).substring(2, 8)}`,
+      timestamp: Date.now(),
+    };
+
+    // Send query via MQTT mesh
+    if (this.mqttClient && this.isMqttConnected) {
+      try {
+        this.mqttClient.publish(MQTT_DISCOVERY_TOPIC, JSON.stringify(queryMsg), { qos: 0 });
+      } catch {
+        // ignore
+      }
+    } else {
+      this.initMqtt();
+    }
+
+    // Send query via BroadcastChannel
+    try {
+      this.broadcastChannel?.postMessage(queryMsg);
+    } catch {
+      // ignore
+    }
+
+    // Check storage registry
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem(STORAGE_REGISTRY_KEY);
+        if (raw) {
+          const registry: Record<string, DiscoveredRoom> = JSON.parse(raw);
+          this.syncFromRegistry(registry);
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   public async scanForNearbyRooms(
     excludeRoomId?: string,
-    timeoutMs: number = 1800
+    timeoutMs: number = 1500
   ): Promise<DiscoveredRoom[]> {
-    const normalizedExclude = excludeRoomId?.toLowerCase();
+    const normalizedExclude = excludeRoomId?.toLowerCase()?.trim();
 
-    // 1. Fetch from LAN / Server Discovery API
+    // 1. Ensure MQTT presence mesh is active and query peers
+    this.initMqtt();
+    this.queryPeers();
+
+    // 2. Fetch from LAN / Server Discovery API concurrently
     const fetchServerRooms = async () => {
       if (typeof window === 'undefined') return;
       try {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), Math.min(timeoutMs, 1400));
+        const timer = setTimeout(() => controller.abort(), Math.min(timeoutMs, 1200));
         
         const res = await fetch('/api/discovery/rooms', {
           signal: controller.signal,
@@ -344,38 +552,10 @@ class DiscoveryService {
           }
         }
       } catch {
-        // Network endpoint not reachable or timed out (offline fallback)
+        // Network endpoint fallback
       }
     };
 
-    // 2. Query BroadcastChannel & Local Storage
-    const queryLocalSources = () => {
-      try {
-        const queryMsg: DiscoveryMessage = {
-          type: 'discovery-query',
-          scannerId: `scan-${Math.random().toString(36).substring(2, 8)}`,
-          timestamp: Date.now(),
-        };
-        this.broadcastChannel?.postMessage(queryMsg);
-      } catch {
-        // ignore
-      }
-
-      if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem(STORAGE_REGISTRY_KEY);
-          if (raw) {
-            const registry: Record<string, DiscoveredRoom> = JSON.parse(raw);
-            this.syncFromRegistry(registry);
-          }
-        } catch {
-          // ignore
-        }
-      }
-    };
-
-    // Execute server fetch and local queries concurrently
-    queryLocalSources();
     await fetchServerRooms();
 
     return new Promise((resolve) => {
@@ -400,17 +580,36 @@ class DiscoveryService {
     });
   }
 
+  public getDiscoveredRooms(excludeRoomId?: string): DiscoveredRoom[] {
+    const now = Date.now();
+    const normalizedExclude = excludeRoomId?.toLowerCase()?.trim();
+    const activeRooms: DiscoveredRoom[] = [];
+
+    for (const [rId, room] of this.discoveredRooms.entries()) {
+      const isFresh = now - room.timestamp < ROOM_EXPIRY_THRESHOLD_MS;
+      const isNotSelf = !normalizedExclude || rId !== normalizedExclude;
+      if (isFresh && isNotSelf && room.isDiscoverable) {
+        activeRooms.push(room);
+      }
+    }
+    return activeRooms;
+  }
+
   public subscribe(callback: (rooms: DiscoveredRoom[]) => void): () => void {
     this.subscribers.add(callback);
+    // Immediately emit current known active rooms
+    try {
+      callback(this.getDiscoveredRooms());
+    } catch {
+      // ignore
+    }
     return () => {
       this.subscribers.delete(callback);
     };
   }
 
   private notifySubscribers() {
-    const list = Array.from(this.discoveredRooms.values()).filter(
-      (r) => Date.now() - r.timestamp < ROOM_EXPIRY_THRESHOLD_MS && r.isDiscoverable
-    );
+    const list = this.getDiscoveredRooms();
     this.subscribers.forEach((cb) => {
       try {
         cb(list);
