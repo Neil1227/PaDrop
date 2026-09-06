@@ -92,6 +92,49 @@ export interface ActiveTransfer {
   startTime: number;
 }
 
+export type DeviceType = 'desktop' | 'mobile' | 'tablet';
+
+export type RoomStatus = 'available' | 'busy' | 'connected';
+
+export interface DiscoveredRoom {
+  roomId: string;
+  displayName: string;
+  deviceType: DeviceType;
+  status: RoomStatus;
+  timestamp: number;
+  isDiscoverable: boolean;
+  lanIp?: string;
+  userCount?: number;
+}
+
+export type DiscoveryScanState = 'idle' | 'scanning' | 'discovered' | 'empty' | 'error';
+
+export interface DiscoveryAnnouncement {
+  type: 'discovery-announce';
+  roomId: string;
+  displayName: string;
+  deviceType: DeviceType;
+  status: RoomStatus;
+  timestamp: number;
+  isDiscoverable: boolean;
+  lanIp?: string;
+}
+
+export interface DiscoveryQuery {
+  type: 'discovery-query';
+  scannerId: string;
+  timestamp: number;
+}
+
+export interface DiscoveryTombstone {
+  type: 'discovery-tombstone';
+  roomId: string;
+  timestamp: number;
+}
+
+export type DiscoveryMessage = DiscoveryAnnouncement | DiscoveryQuery | DiscoveryTombstone;
+
 declare global {
   const __LOCAL_LAN_IP__: string;
 }
+

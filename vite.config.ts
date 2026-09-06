@@ -15,6 +15,114 @@ function getLocalLanIp(): string {
   return '';
 }
 
+import type { Plugin } from 'vite'
+
+interface DiscoveredRoomServer {
+  roomId: string;
+  displayName: string;
+  deviceType: string;
+  status: string;
+  timestamp: number;
+  isDiscoverable: boolean;
+  lanIp?: string;
+}
+
+const activeRoomsRegistry = new Map<string, DiscoveredRoomServer>();
+const ROOM_TTL_MS = 15000;
+
+function discoveryServerPlugin(): Plugin {
+  return {
+    name: 'padrop-discovery-server',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (!req.url || !req.url.startsWith('/api/discovery')) {
+          return next();
+        }
+
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+        if (req.method === 'OPTIONS') {
+          res.statusCode = 204;
+          return res.end();
+        }
+
+        const now = Date.now();
+        // Clean stale rooms
+        for (const [key, val] of activeRoomsRegistry.entries()) {
+          if (now - val.timestamp > ROOM_TTL_MS) {
+            activeRoomsRegistry.delete(key);
+          }
+        }
+
+        if (req.url.startsWith('/api/discovery/rooms') && req.method === 'GET') {
+          const list = Array.from(activeRoomsRegistry.values()).filter((r) => r.isDiscoverable);
+          res.statusCode = 200;
+          return res.end(JSON.stringify({ ok: true, rooms: list }));
+        }
+
+        if (req.url.startsWith('/api/discovery/announce') && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              if (data && data.roomId) {
+                if (data.isDiscoverable !== false) {
+                  activeRoomsRegistry.set(data.roomId.toLowerCase(), {
+                    roomId: data.roomId.toLowerCase(),
+                    displayName: data.displayName || `Host ${data.roomId}`,
+                    deviceType: data.deviceType || 'desktop',
+                    status: data.status || 'available',
+                    timestamp: Date.now(),
+                    isDiscoverable: true,
+                    lanIp: data.lanIp,
+                  });
+                } else {
+                  activeRoomsRegistry.delete(data.roomId.toLowerCase());
+                }
+              }
+              res.statusCode = 200;
+              return res.end(JSON.stringify({ ok: true }));
+            } catch {
+              res.statusCode = 400;
+              return res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+            }
+          });
+          return;
+        }
+
+        if (req.url.startsWith('/api/discovery/tombstone') && req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk) => {
+            body += chunk;
+          });
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              if (data && data.roomId) {
+                activeRoomsRegistry.delete(data.roomId.toLowerCase());
+              }
+              res.statusCode = 200;
+              return res.end(JSON.stringify({ ok: true }));
+            } catch {
+              res.statusCode = 400;
+              return res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }));
+            }
+          });
+          return;
+        }
+
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
   define: {
     __LOCAL_LAN_IP__: JSON.stringify(getLocalLanIp()),
@@ -24,7 +132,9 @@ export default defineConfig({
     port: 5173,
   },
   plugins: [
+    discoveryServerPlugin(),
     react(),
+
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [

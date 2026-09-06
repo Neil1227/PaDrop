@@ -8,6 +8,7 @@ import { ClipboardSection } from './components/ClipboardSection';
 import { FileDropzoneSection } from './components/FileDropzoneSection';
 import { InfoModal } from './components/InfoModal';
 import { PeerService } from './services/peerService';
+import { discoveryService } from './services/discoveryService';
 import type { ConnectionState, TransferFile, ActiveTransfer, ChatMessage } from './types';
 
 // Helper to generate 6-character clean room ID
@@ -60,11 +61,21 @@ export function App() {
       peerServiceRef.current.cleanup();
     }
 
+    if (mode === 'host') {
+      discoveryService.startHostBroadcast({ roomId: rId, isDiscoverable: true });
+    } else {
+      discoveryService.stopHostBroadcast();
+    }
+
     const service = new PeerService({
       onConnectionChange: (state, errorMsg) => {
         setConnectionState(state);
         if (errorMsg) setErrorMessage(errorMsg);
         else setErrorMessage(null);
+
+        if (mode === 'host') {
+          discoveryService.updateHostStatus(state === 'connected' ? 'connected' : 'available');
+        }
 
         if (state === 'connected') {
           // Trigger delightful celebratory confetti!
@@ -129,8 +140,10 @@ export function App() {
 
     return () => {
       peerServiceRef.current?.cleanup();
+      discoveryService.stopHostBroadcast();
     };
   }, []);
+
 
   const handleManualJoin = (targetRoomId: string) => {
     const cleaned = targetRoomId.trim().toLowerCase();
