@@ -550,6 +550,18 @@ export class PeerService {
     }
   }
 
+  public disconnect() {
+    if (this.connection) {
+      try {
+        this.connection.close();
+      } catch {
+        // ignore
+      }
+      this.connection = null;
+    }
+    this.setConnectionState(this.isHost ? 'waiting' : 'disconnected');
+  }
+
   public cleanup() {
     if (this.connectRetryTimer) {
       clearTimeout(this.connectRetryTimer);

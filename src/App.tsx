@@ -217,6 +217,14 @@ export function App() {
     setPendingTransferRequest(null);
   };
 
+  const handleDisconnect = () => {
+    if (peerServiceRef.current) {
+      peerServiceRef.current.disconnect();
+    }
+    setActiveTransfer(null);
+    setPendingTransferRequest(null);
+  };
+
   return (
     <div className="min-h-screen bg-canvas bg-canvas-gradient flex flex-col selection:bg-signalEnd selection:text-white">
       {/* Top Bar */}
@@ -277,6 +285,7 @@ export function App() {
           isHost={isHost}
           onJoinRoom={handleManualJoin}
           onSwitchRole={handleSwitchRole}
+          onDisconnect={handleDisconnect}
         />
 
         {/* 2-Column Responsive Dashboard */}
