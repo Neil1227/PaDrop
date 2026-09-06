@@ -1,4 +1,4 @@
-import { useState, useRef, type DragEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type DragEvent, type ChangeEvent } from 'react';
 import {
   UploadCloud,
   File as FileIcon,
@@ -10,7 +10,11 @@ import {
   Archive,
   ArrowUpRight,
   ArrowDownLeft,
-  HardDrive
+  HardDrive,
+  X,
+  Send,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import type { TransferFile, ActiveTransfer, ConnectionState } from '../types';
@@ -20,6 +24,15 @@ interface FileDropzoneSectionProps {
   activeTransfer: ActiveTransfer | null;
   connectionState: ConnectionState;
   onSendFile: (file: File) => void;
+}
+
+interface StagedFile {
+  id: string;
+  file: File;
+  name: string;
+  size: number;
+  mimeType: string;
+  previewUrl?: string;
 }
 
 function formatBytes(bytes: number, decimals = 1): string {
@@ -62,15 +75,86 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
   onSendFile,
 }) => {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const isConnected = connectionState === 'connected';
+
+  // Revoke preview object URLs when staged files change or on unmount
+  useEffect(() => {
+    return () => {
+      stagedFiles.forEach((f) => {
+        if (f.previewUrl) {
+          URL.revokeObjectURL(f.previewUrl);
+        }
+      });
+    };
+  }, []);
+
+  const addFilesToStaging = (newFiles: FileList | File[]) => {
+    const additions: StagedFile[] = [];
+    for (let i = 0; i < newFiles.length; i++) {
+      const file = newFiles[i];
+      const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg)$/i.test(file.name);
+      const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov)$/i.test(file.name);
+      
+      let previewUrl: string | undefined;
+      if (isImage || isVideo) {
+        try {
+          previewUrl = URL.createObjectURL(file);
+        } catch {
+          // ignore
+        }
+      }
+
+      additions.push({
+        id: `staged-${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${i}`,
+        file,
+        name: file.name,
+        size: file.size,
+        mimeType: file.type || 'application/octet-stream',
+        previewUrl,
+      });
+    }
+
+    setStagedFiles((prev) => [...prev, ...additions]);
+  };
+
+  const handleRemoveStagedFile = (id: string) => {
+    setStagedFiles((prev) => {
+      const item = prev.find((f) => f.id === id);
+      if (item?.previewUrl) {
+        URL.revokeObjectURL(item.previewUrl);
+      }
+      return prev.filter((f) => f.id !== id);
+    });
+  };
+
+  const handleClearStaged = () => {
+    stagedFiles.forEach((f) => {
+      if (f.previewUrl) {
+        URL.revokeObjectURL(f.previewUrl);
+      }
+    });
+    setStagedFiles([]);
+  };
+
+  const handleSendStagedFiles = () => {
+    if (!isConnected || stagedFiles.length === 0) return;
+    
+    // Dispatch all staged files to transfer queue
+    for (const staged of stagedFiles) {
+      onSendFile(staged.file);
+      if (staged.previewUrl) {
+        URL.revokeObjectURL(staged.previewUrl);
+      }
+    }
+    setStagedFiles([]);
+  };
 
   const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (isConnected) {
-      setIsDragOver(true);
-    }
+    setIsDragOver(true);
   };
 
   const handleDragLeave = (e: DragEvent) => {
@@ -84,20 +168,14 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
     e.stopPropagation();
     setIsDragOver(false);
 
-    if (!isConnected) return;
-
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      for (let i = 0; i < e.dataTransfer.files.length; i++) {
-        onSendFile(e.dataTransfer.files[i]);
-      }
+      addFilesToStaging(e.dataTransfer.files);
     }
   };
 
   const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      for (let i = 0; i < e.target.files.length; i++) {
-        onSendFile(e.target.files[i]);
-      }
+      addFilesToStaging(e.target.files);
       e.target.value = '';
     }
   };
@@ -118,7 +196,7 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
       setTimeout(() => URL.revokeObjectURL(url), 2000);
     }
 
-    // Optional flair
+    // Optional celebratory flair
     try {
       confetti({
         particleCount: 40,
@@ -130,6 +208,8 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
       // ignore
     }
   };
+
+  const totalStagedBytes = stagedFiles.reduce((acc, f) => acc + f.size, 0);
 
   return (
     <div className="flex flex-col h-full bg-surface border border-surfaceBorder rounded-2xl p-5 shadow-surface-elevated">
@@ -144,13 +224,13 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
               Chunked File Dropzone
             </h3>
             <p className="text-xs text-slate-400">
-              High-speed 64 KB chunk streaming over encrypted WebRTC
+              Stage images, videos & files for high-speed WebRTC transfer
             </p>
           </div>
         </div>
 
         <div className="text-xs text-slate-400 font-mono">
-          <span>{files.length} file{files.length === 1 ? '' : 's'}</span>
+          <span>{files.length} sent/received</span>
         </div>
       </div>
 
@@ -160,13 +240,11 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => isConnected && fileInputRef.current?.click()}
-        className={`relative mt-4 border-2 border-dashed rounded-xl p-6 text-center flex flex-col items-center justify-center gap-3 transition-all duration-300 ${
-          !isConnected
-            ? 'border-surfaceBorder bg-canvas/40 opacity-60 cursor-not-allowed'
-            : isDragOver
-            ? 'border-signalEnd bg-signalEnd/10 scale-[1.01] shadow-[0_0_20px_rgba(255,24,64,0.3)] cursor-pointer'
-            : 'border-surfaceBorder hover:border-cobalt bg-canvas/60 hover:bg-canvas cursor-pointer'
+        onClick={() => fileInputRef.current?.click()}
+        className={`relative mt-4 border-2 border-dashed rounded-xl p-5 sm:p-6 text-center flex flex-col items-center justify-center gap-3 transition-all duration-300 cursor-pointer ${
+          isDragOver
+            ? 'border-signalEnd bg-signalEnd/10 scale-[1.01] shadow-[0_0_20px_rgba(255,24,64,0.3)]'
+            : 'border-surfaceBorder hover:border-cobalt bg-canvas/60 hover:bg-canvas'
         }`}
       >
         <input
@@ -175,7 +253,6 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
           multiple
           onChange={handleFileInputChange}
           className="hidden"
-          disabled={!isConnected}
         />
 
         <div className="p-3.5 rounded-2xl bg-surface border border-surfaceBorder text-slate-300 shadow-inner group">
@@ -188,22 +265,134 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
 
         <div className="flex flex-col gap-1">
           <p className="text-sm font-semibold text-white">
-            {isConnected ? (
-              <span>
-                Drop files here or{' '}
-                <span className="text-signal-gradient underline decoration-signalEnd/50">
-                  browse to send
-                </span>
+            <span>
+              Drop photos, videos or documents or{' '}
+              <span className="text-signal-gradient underline decoration-signalEnd/50">
+                browse files
               </span>
-            ) : (
-              <span>Connect to peer to start streaming files</span>
-            )}
+            </span>
           </p>
           <p className="text-xs text-slate-400">
-            Supports any file size • 64 KB WebRTC data-chunking engine with backpressure control
+            Preview images & videos before sending • 64 KB chunked streaming
           </p>
         </div>
       </div>
+
+      {/* STAGED / PENDING FILES QUEUE */}
+      {stagedFiles.length > 0 && (
+        <div className="mt-4 p-4 rounded-xl bg-canvas border border-cobalt/40 flex flex-col gap-3 shadow-md animate-fadeIn">
+          {/* Staged Header */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cobalt text-white">
+                STAGED
+              </span>
+              <span className="text-xs font-bold text-white">
+                {stagedFiles.length} file{stagedFiles.length === 1 ? '' : 's'} ready to send
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono">
+                ({formatBytes(totalStagedBytes)})
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleClearStaged}
+              className="text-[11px] text-slate-400 hover:text-rose-400 transition-colors flex items-center gap-1"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear</span>
+            </button>
+          </div>
+
+          {/* Staged Previews Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
+            {stagedFiles.map((item) => (
+              <div
+                key={item.id}
+                className="relative group flex flex-col p-2 rounded-xl bg-surface border border-surfaceBorder hover:border-slate-500 transition-all overflow-hidden"
+              >
+                {/* Remove button */}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveStagedFile(item.id)}
+                  title="Remove file"
+                  aria-label={`Remove ${item.name}`}
+                  className="absolute top-1.5 right-1.5 z-10 w-6 h-6 rounded-full bg-black/70 hover:bg-rose-600 text-white flex items-center justify-center text-xs transition-colors shadow-sm"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Media Preview Box */}
+                <div className="w-full h-20 rounded-lg bg-canvas border border-surfaceBorder/80 flex items-center justify-center overflow-hidden mb-1.5 relative">
+                  {item.previewUrl && item.mimeType.startsWith('image/') ? (
+                    <img
+                      src={item.previewUrl}
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : item.previewUrl && item.mimeType.startsWith('video/') ? (
+                    <div className="relative w-full h-full bg-slate-900 flex items-center justify-center">
+                      <video
+                        src={item.previewUrl}
+                        className="w-full h-full object-cover opacity-80"
+                        muted
+                        playsInline
+                      />
+                      <Film className="w-6 h-6 text-sky-400 absolute drop-shadow-md" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      {getFileIcon(item.mimeType, item.name)}
+                    </div>
+                  )}
+                </div>
+
+                {/* File info */}
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-semibold text-white truncate" title={item.name}>
+                    {item.name}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {formatBytes(item.size)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Action Row */}
+          <div className="flex items-center gap-2 pt-1 border-t border-surfaceBorder">
+            <button
+              type="button"
+              onClick={handleSendStagedFiles}
+              disabled={!isConnected}
+              className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white transition-all shadow-md active:scale-95 ${
+                isConnected
+                  ? 'bg-signal-gradient hover:opacity-95 shadow-[0_0_16px_rgba(255,24,64,0.45)]'
+                  : 'bg-surfaceBorder text-slate-400 cursor-not-allowed opacity-75'
+              }`}
+            >
+              <Send className="w-4 h-4" />
+              <span>
+                {isConnected
+                  ? `Send ${stagedFiles.length} File${stagedFiles.length === 1 ? '' : 's'} (${formatBytes(totalStagedBytes)})`
+                  : `Waiting for Peer to Connect... (${stagedFiles.length} Staged)`}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              title="Add more files"
+              className="min-h-[44px] px-3 py-2.5 rounded-xl bg-surface border border-surfaceBorder hover:border-slate-400 text-xs font-semibold text-slate-300 hover:text-white transition-all flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" />
+              <span className="hidden sm:inline">Add More</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Active Transfer Bar (10% Kinetic Accent) */}
       {activeTransfer && (
@@ -253,7 +442,7 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
       {/* Transfer Tray / File List */}
       <div className="mt-4 flex-1 flex flex-col min-h-[160px]">
         <h4 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
-          Transfer Tray
+          Transfer History & Completed Files
         </h4>
 
         {files.length === 0 ? (
@@ -261,7 +450,7 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
             <FileIcon className="w-8 h-8 stroke-1 mb-2 text-slate-600" />
             <p>No files transferred yet</p>
             <p className="text-[11px] text-slate-600 mt-0.5">
-              Dropped files will appear here with immediate download options
+              Completed and received files will appear here with immediate download buttons
             </p>
           </div>
         ) : (
@@ -293,11 +482,13 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
                   </div>
                 </div>
 
-                {/* Explicit Download Action Button (10% Kinetic Accent) */}
+                {/* Explicit Download Action Button */}
                 <button
+                  type="button"
                   onClick={() => triggerDownload(file)}
                   title={`Download ${file.name}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-signal-gradient hover:opacity-95 active:scale-95 transition-all shadow-[0_0_12px_rgba(255,24,64,0.35)] shrink-0"
+                  aria-label={`Download ${file.name}`}
+                  className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-signal-gradient hover:opacity-95 active:scale-95 transition-all shadow-[0_0_12px_rgba(255,24,64,0.35)] shrink-0"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download</span>
@@ -310,3 +501,4 @@ export const FileDropzoneSection: React.FC<FileDropzoneSectionProps> = ({
     </div>
   );
 };
+
